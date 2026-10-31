@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Nomrank",
+    "slug": "nomrank",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "nomrank",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "in.nomrank.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#17111c",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#17111c",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 160
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
