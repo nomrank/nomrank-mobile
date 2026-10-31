@@ -1,0 +1,77 @@
+name: Android test APK
+
+# Every push to main builds an APK and publishes it as a GitHub release, so a phone can install the latest build.
+# The APK is signed with a fixed test key (secret ANDROID_DEBUG_KEYSTORE_BASE64), so each build installs over the last one.
+# This is for testing only: Play releases will use their own upload key.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Version
+        id: ver
+        run: |
+          # versionCode must rise with every build so a newer APK installs over an older one
+          node -e 'const f="app.json",j=require("./"+f);j.expo.android.versionCode=Number(process.env.RUN);require("fs").writeFileSync(f,JSON.stringify(j,null,2))'
+          echo "name=$(node -p 'require("./app.json").expo.version')" >> "$GITHUB_OUTPUT"
+        env:
+          RUN: ${{ github.run_number }}
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Test signing key
+        run: echo "${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}" | base64 -d > android/app/debug.keystore
+
+      - name: Build the APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: Name the file
+        id: apk
+        run: |
+          APK="nomrank-${{ steps.ver.outputs.name }}-build${{ github.run_number }}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK"
+          echo "file=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ github.event.head_commit.message }}
+        run: |
+          gh release create "build-${{ github.run_number }}" "${{ steps.apk.outputs.file }}" \
+            --prerelease \
+            --title "Nomrank ${{ steps.ver.outputs.name }} (build ${{ github.run_number }})" \
+            --notes "$NOTES"
