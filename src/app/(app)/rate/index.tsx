@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, ZoomIn } from "react-native-reanimated";
 import { ArrowDownIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, HouseIcon, ImagePlusIcon, PlusIcon, SearchIcon, SparklesIcon, TrophyIcon, XIcon } from "lucide-react-native";
 import { filterMenus } from "@/core/diet";
 import { dishKey } from "@/core/dishes";
@@ -103,7 +103,9 @@ function PostedPanel({ posted: p }: { posted: Posted }) {
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 12 }}>
       <Animated.View entering={FadeInDown.duration(360)} style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-        <Score score={p.score} size={84} />
+        <Animated.View entering={ZoomIn.delay(80).springify().damping(11)}>
+          <Score score={p.score} size={84} />
+        </Animated.View>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <CheckIcon size={15} color={colors.mustardInk} strokeWidth={3} />
@@ -359,11 +361,5 @@ function RateDish({ id }: { id: string }) {
 
 export default function Rate() {
   const { dish } = useLocalSearchParams<{ dish?: string }>();
-  const { profile } = useSession();
-  const router = useRouter();
-  useEffect(() => {
-    if (!profile) router.replace("/login");
-  }, [profile, router]);
-  if (!profile) return null;
   return dish ? <RateDish key={dish} id={dish} /> : <DishPicker />;
 }

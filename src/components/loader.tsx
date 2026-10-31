@@ -1,30 +1,65 @@
 import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
-import { T } from "./ui";
-import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
-import { LogoMark } from "./logo-mark";
-import { useTheme } from "@/theme";
+import { View } from "react-native";
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
+import { FACE, FOX, HAND, LEAF, MARK_VIEWBOX, SPARKLE } from "@/brand/logo";
+import { brand, useTheme } from "@/theme";
 
-// The fox floats gently while the app loads. Reduced motion: it just sits there.
-export function Loader({ label = "Loading" }: { label?: string }) {
-  const { colors } = useTheme();
-  const reduce = useReducedMotion();
-  const lift = useSharedValue(0);
-  useEffect(() => {
-    if (reduce) return;
-    lift.value = withRepeat(withSequence(withTiming(-8, { duration: 900, easing: Easing.inOut(Easing.quad) }), withTiming(0, { duration: 900, easing: Easing.inOut(Easing.quad) })), -1);
-  }, [lift, reduce]);
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: lift.value }] }));
+const EASE = Easing.inOut(Easing.quad);
+
+function Layer({ size, style, children }: { size: number; style: ReturnType<typeof useAnimatedStyle>; children: React.ReactNode }) {
   return (
-    <View accessibilityRole="progressbar" accessibilityLabel={label} style={[styles.wrap, { backgroundColor: colors.background }]}>
-      <Animated.View style={style}>
-        <LogoMark size={88} />
-      </Animated.View>
-      <T size={14} color={colors.muted}>{label}…</T>
+    <Animated.View style={[{ position: "absolute", width: size, height: size }, style]}>
+      <Svg width={size} height={size} viewBox={MARK_VIEWBOX}>
+        {children}
+      </Svg>
+    </Animated.View>
+  );
+}
+
+function useLoop(value: SharedValue<number>, duration: number, pause: number, reduce: boolean) {
+  useEffect(() => {
+    if (!reduce) value.value = withRepeat(withSequence(withTiming(1, { duration, easing: EASE }), withTiming(0, { duration, easing: EASE }), withDelay(pause, withTiming(0, { duration: 1 }))), -1);
+  }, [value, duration, pause, reduce]);
+}
+
+// The fox, alive: the head floats, the hand gives its OK now and then, the sparkle glints. No words. Each piece is its own
+// layer, so it stays smooth while the screen loads. Reduced motion: it sits still.
+export function FoxLoader({ size = 72 }: { size?: number }) {
+  const { scheme } = useTheme();
+  const reduce = useReducedMotion();
+  const face = scheme === "light" ? "#f1c4a6" : "#fff4ea";
+  const lift = useSharedValue(0);
+  const wave = useSharedValue(0);
+  const glint = useSharedValue(0);
+  useLoop(lift, 900, 0, reduce);
+  useLoop(wave, 220, 1100, reduce);
+  useLoop(glint, 500, 500, reduce);
+  const head = useAnimatedStyle(() => ({ transform: [{ translateY: lift.value * -size * 0.05 }] }));
+  const hand = useAnimatedStyle(() => ({ transformOrigin: "82% 90%", transform: [{ rotate: `${wave.value * 12}deg` }] }));
+  const sparkle = useAnimatedStyle(() => ({ transformOrigin: "85% 28%", opacity: 1 - glint.value * 0.5, transform: [{ scale: 1 + glint.value * 0.35 }] }));
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading" style={{ width: size, height: size }}>
+      <Layer size={size} style={head}>
+        <Path d={FOX} fill={brand.ketchup} fillRule="evenodd" />
+        <Path d={FACE} fill={face} fillRule="evenodd" />
+        <Path d={LEAF} fill={face} fillRule="evenodd" />
+      </Layer>
+      <Layer size={size} style={hand}>
+        <Path d={HAND} fill={brand.ketchup} fillRule="evenodd" />
+      </Layer>
+      <Layer size={size} style={sparkle}>
+        <Path d={SPARKLE} fill={brand.mustard} fillRule="evenodd" />
+      </Layer>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16 },
-});
+export function Loader() {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}>
+      <FoxLoader size={96} />
+    </View>
+  );
+}

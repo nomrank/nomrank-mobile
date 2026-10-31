@@ -1,16 +1,28 @@
+import { useEffect } from "react";
 import { Pressable, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming, ZoomIn } from "react-native-reanimated";
 import { Tabs, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BellIcon, HomeIcon, LogInIcon, PlusIcon, SwordsIcon } from "lucide-react-native";
+import { BellIcon, HomeIcon, PlusIcon, SwordsIcon } from "lucide-react-native";
 import { Avatar } from "@/components/marks";
 import { T } from "@/components/ui";
 import { useActivity } from "@/lib/activity";
 import { useSession } from "@/lib/session";
 import { brand, useTheme } from "@/theme";
 
+// The icon gives a small hop when its tab is picked.
+function Pop({ on, children }: { on: boolean; children: React.ReactNode }) {
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (on) scale.value = withSequence(withTiming(1.14, { duration: 110 }), withSpring(1, { damping: 12, stiffness: 240 }));
+  }, [on, scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
 const LABELS: Record<string, string> = { index: "Home", battles: "Battles", notifications: "Activity", you: "You" };
 
-// The bottom bar: Home, Battles, the big Rate button, Activity and You. Signed out it's Home, Battles and Sign in.
+// The bottom bar: Home, Battles, the big Rate button, Activity and You.
 function TabBar({ state, navigation }: { state: { index: number; routes: { key: string; name: string }[] }; navigation: { navigate: (name: string) => void; emit: (e: { type: "tabPress"; target: string; canPreventDefault: true }) => { defaultPrevented: boolean } } }) {
   const { colors } = useTheme();
   const { bottom } = useSafeAreaInsets();
@@ -30,8 +42,8 @@ function TabBar({ state, navigation }: { state: { index: number; routes: { key: 
       accessibilityState={{ selected: active }}
       style={{ flex: 1, height: 56, alignItems: "center", justifyContent: "center", gap: 2 }}
     >
-      {active && <View style={{ position: "absolute", top: 0, width: 24, height: 2, borderRadius: 2, backgroundColor: brand.ketchup }} />}
-      {icon}
+      {active && <Animated.View entering={ZoomIn.duration(180)} style={{ position: "absolute", top: 0, width: 24, height: 2, borderRadius: 2, backgroundColor: brand.ketchup }} />}
+      <Pop on={active}>{icon}</Pop>
       <T size={11} weight={600} color={active ? colors.foreground : colors.faint}>
         {label}
       </T>
@@ -44,12 +56,14 @@ function TabBar({ state, navigation }: { state: { index: number; routes: { key: 
     <View accessibilityRole="tablist" style={{ flexDirection: "row", paddingBottom: bottom, backgroundColor: colors.paper, borderTopWidth: 1, borderTopColor: colors.hairline }}>
       {tab("index", current === "index", <HomeIcon size={22} color={ink("index")} />, LABELS.index)}
       {tab("battles", current === "battles", <SwordsIcon size={22} color={ink("battles")} />, LABELS.battles)}
-      {profile ? (
+      {profile && (
         <>
           <Pressable onPress={() => router.push("/rate")} accessibilityRole="button" accessibilityLabel="Rate a dish" style={{ flex: 1, height: 56, alignItems: "center" }}>
-            <View style={{ position: "absolute", top: -16, width: 52, height: 52, borderRadius: 26, backgroundColor: brand.ketchup, alignItems: "center", justifyContent: "center", elevation: 6 }}>
-              <PlusIcon size={26} color={brand.studio} strokeWidth={2.75} />
-            </View>
+            {({ pressed }) => (
+              <View style={{ position: "absolute", top: -16, width: 52, height: 52, borderRadius: 26, backgroundColor: brand.ketchup, alignItems: "center", justifyContent: "center", elevation: 6, transform: [{ scale: pressed ? 0.92 : 1 }] }}>
+                <PlusIcon size={26} color={brand.studio} strokeWidth={2.75} />
+              </View>
+            )}
           </Pressable>
           {tab(
             "notifications",
@@ -69,13 +83,6 @@ function TabBar({ state, navigation }: { state: { index: number; routes: { key: 
           )}
           {tab("you", current === "you", <Avatar handle={profile.username} code={profile.avatar} photo={profile.avatar_path} size={24} />, LABELS.you)}
         </>
-      ) : (
-        <Pressable onPress={() => router.push("/login")} accessibilityRole="button" style={{ flex: 1, height: 56, alignItems: "center", justifyContent: "center", gap: 2 }}>
-          <LogInIcon size={22} color={colors.faint} />
-          <T size={11} weight={600} color={colors.faint}>
-            Sign in
-          </T>
-        </Pressable>
       )}
     </View>
   );

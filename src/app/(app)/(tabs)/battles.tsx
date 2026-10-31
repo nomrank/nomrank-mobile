@@ -3,17 +3,20 @@ import { FlatList, Pressable, Share, View, type LayoutChangeEvent } from "react-
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import Animated, { useAnimatedStyle, useReducedMotion, withTiming } from "react-native-reanimated";
+import Animated, { FadeInLeft, FadeInRight, useAnimatedStyle, useReducedMotion, withTiming, ZoomIn } from "react-native-reanimated";
 import { CheckIcon, FlameIcon, ShareIcon, SwordsIcon, TrophyIcon } from "lucide-react-native";
 import { getBattles, split, type Battle } from "@/core/battles";
 import { DietMark } from "@/components/marks";
 import { toast } from "@/components/toast";
 import { CityPicker } from "@/components/social";
-import { Btn, Failed, Loading, T, useData } from "@/components/ui";
+import { Btn, Failed, Loading, Press, T, useData } from "@/components/ui";
 import { voteBattle } from "@/lib/actions";
 import { useSession } from "@/lib/session";
 import { SITE, supabase } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
+
+// FlatList throws if this object changes between renders, so it lives out here.
+const VIEWABILITY = { itemVisiblePercentThreshold: 60 };
 
 // One corner: a tall colour tile with the dish's score big in it. Voting fills it from the base to its share of the votes.
 function Side({ battle, side, percent, lead, saving, onVote }: { battle: Battle; side: "a" | "b"; percent: number; lead: boolean; saving: boolean; onVote: (b: Battle, s: "a" | "b") => void }) {
@@ -23,11 +26,12 @@ function Side({ battle, side, percent, lead, saving, onVote }: { battle: Battle;
   const voted = battle.mine !== null;
   const mine = battle.mine === side;
   const rated = d.avg !== null && d.count > 0;
-  const fill = useAnimatedStyle(() => ({ height: withTiming(`${voted ? percent : 0}%`, { duration: reduce ? 0 : 700 }) }));
+  const fill = useAnimatedStyle(() => ({ transform: [{ scaleY: withTiming(voted ? percent / 100 : 0, { duration: reduce ? 0 : 700 }) }] }));
   return (
-    <Pressable onPress={() => onVote(battle, side)} accessibilityRole="button" accessibilityLabel={`Vote for ${d.name} at ${d.place}`} accessibilityState={{ selected: mine }} style={({ pressed }) => ({ flex: 1, minWidth: 0, gap: 10, opacity: voted && !mine ? 0.6 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] })}>
+    <Animated.View entering={(side === "a" ? FadeInLeft : FadeInRight).duration(420).delay(side === "a" ? 80 : 180)} style={{ flex: 1, minWidth: 0 }}>
+      <Press onPress={() => onVote(battle, side)} accessibilityRole="button" accessibilityLabel={`Vote for ${d.name} at ${d.place}`} accessibilityState={{ selected: mine }} style={{ gap: 10, opacity: voted && !mine ? 0.6 : 1 }}>
       <View style={{ aspectRatio: 3 / 4, maxHeight: 340, borderRadius: 24, padding: 14, overflow: "hidden", justifyContent: "space-between", backgroundColor: side === "a" ? brand.ketchup : brand.mustard, borderWidth: mine ? 3 : 0, borderColor: colors.foreground }}>
-        <Animated.View style={[{ position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "rgba(23,17,28,0.25)" }, fill]} />
+        <Animated.View style={[{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, transformOrigin: "bottom", backgroundColor: "rgba(23,17,28,0.25)" }, fill]} />
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
           <View style={{ backgroundColor: "#fff4ea", borderRadius: 6, padding: 4 }}>
             <DietMark diet={d.diet} size={12} />
@@ -64,7 +68,8 @@ function Side({ battle, side, percent, lead, saving, onVote }: { battle: Battle;
           {battle.city === null && ` · ${d.city}`}
         </T>
       </View>
-    </Pressable>
+      </Press>
+    </Animated.View>
   );
 }
 
@@ -89,11 +94,11 @@ const BattleCard = memo(function BattleCard({ battle: b, index, total, height, s
         <Side battle={b} side="a" percent={s.a} lead={voted && s.n > 1 && b.votes.a > b.votes.b} saving={saving} onVote={onVote} />
         <Side battle={b} side="b" percent={s.b} lead={voted && s.n > 1 && b.votes.b > b.votes.a} saving={saving} onVote={onVote} />
         {!voted && (
-          <View pointerEvents="none" style={{ position: "absolute", left: "50%", top: 110, marginLeft: -24, width: 48, height: 48, borderRadius: 24, borderWidth: 4, borderColor: colors.background, backgroundColor: brand.studio, alignItems: "center", justifyContent: "center" }}>
+          <Animated.View entering={ZoomIn.delay(460).springify().damping(13)} pointerEvents="none" style={{ position: "absolute", left: "50%", top: 110, marginLeft: -24, width: 48, height: 48, borderRadius: 24, borderWidth: 4, borderColor: colors.background, backgroundColor: brand.studio, alignItems: "center", justifyContent: "center" }}>
             <T size={14} weight={800} color="#fff4ea">
               VS
             </T>
-          </View>
+          </Animated.View>
         )}
       </View>
       <View style={{ alignItems: "center", gap: 10, minHeight: 74, justifyContent: "center" }}>
@@ -128,7 +133,7 @@ const BattleCard = memo(function BattleCard({ battle: b, index, total, height, s
 export default function Battles() {
   const { colors } = useTheme();
   const { top } = useSafeAreaInsets();
-  const { userId, profile, city } = useSession();
+  const { userId, city } = useSession();
   const router = useRouter();
   const params = useLocalSearchParams<{ b?: string }>();
   const { data, failed, reload } = useData(() => getBattles(supabase, userId, city), [userId, city]);
@@ -147,7 +152,7 @@ export default function Battles() {
 
   const vote = useCallback(
     async (battle: Battle, side: "a" | "b") => {
-      if (!profile || !userId) return router.push("/login");
+      if (!userId) return;
       if (battle.mine === side) return;
       const first = battle.mine === null;
       const optimistic = { ...battle, mine: side, votes: { a: battle.votes.a + (side === "a" ? 1 : 0) - (battle.mine === "a" ? 1 : 0), b: battle.votes.b + (side === "b" ? 1 : 0) - (battle.mine === "b" ? 1 : 0) } };
@@ -170,7 +175,7 @@ export default function Battles() {
         if (onScreen.current === battle.id && at >= 0) list.current?.scrollToOffset({ offset: (at + 1) * heightRef.current, animated: true });
       }, 2000);
     },
-    [profile, userId, router],
+    [userId],
   );
   const battlesRef = useRef(battles);
   battlesRef.current = battles;
@@ -208,7 +213,7 @@ export default function Battles() {
             getItemLayout={(_, i) => ({ length: height, offset: height * i, index: i })}
             initialScrollIndex={start}
             onViewableItemsChanged={onViewable}
-            viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+            viewabilityConfig={VIEWABILITY}
             renderItem={({ item, index }) =>
               item === "end" ? (
                 <View style={{ height, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 }}>

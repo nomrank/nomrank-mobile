@@ -71,7 +71,7 @@ function Dot({ index, scroll, width }: { index: number; scroll: SharedValue<numb
   return <Animated.View style={[{ height: 8, borderRadius: 4, backgroundColor: INK.foreground }, style]} />;
 }
 
-// Three landing screens: swipe, or tap through. Skip goes straight to sign-in; Browse dishes looks around without an account.
+// Three landing screens: swipe, or tap through. Skip goes straight to sign-in.
 export default function Welcome() {
   const { width, height } = useWindowDimensions();
   const { top, bottom } = useSafeAreaInsets();
@@ -85,13 +85,13 @@ export default function Welcome() {
   const onScroll = useAnimatedScrollHandler((e) => {
     scroll.value = e.contentOffset.x;
   });
-  const finish = (login: boolean) => {
+  const finish = () => {
     if (lock.current) return;
     lock.current = true;
-    finishIntro(login);
+    finishIntro();
   };
   const next = () => {
-    if (last) return finish(true);
+    if (last) return finish();
     list.current?.scrollTo({ x: (page + 1) * width, animated: true });
     setPage(page + 1);
   };
@@ -122,7 +122,7 @@ export default function Welcome() {
             <T size={16} color={INK.muted} style={{ marginTop: 10, maxWidth: 300, lineHeight: 23 }}>
               {s.text}
             </T>
-            <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: bottom + 178, height: artHeight * 0.74 }}>
+            <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: bottom + 128, height: artHeight * 0.74 }}>
               {s.plates.map((p, n) => (
                 <PlateArt key={n} plate={p} index={i} scroll={scroll} width={width} height={artHeight * 0.74} />
               ))}
@@ -143,7 +143,7 @@ export default function Welcome() {
         <T style={{ fontFamily: WORDMARK, fontSize: 24, letterSpacing: -0.8, color: INK.foreground }}>
           nomrank<T style={{ fontFamily: WORDMARK, fontSize: 24, color: brand.ketchup }}>.</T>
         </T>
-        <Pressable onPress={() => finish(true)} accessibilityRole="button" hitSlop={8} style={{ minHeight: 44, minWidth: 44, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" }}>
+        <Pressable onPress={finish} accessibilityRole="button" hitSlop={8} style={{ minHeight: 44, minWidth: 44, paddingHorizontal: 12, alignItems: "center", justifyContent: "center" }}>
           <T size={15} color={INK.muted}>
             Skip
           </T>
@@ -161,11 +161,6 @@ export default function Welcome() {
             {last ? "Get started" : "Next"}
           </T>
           <ArrowRightIcon size={20} color={brand.studio} />
-        </Pressable>
-        <Pressable onPress={() => finish(false)} accessibilityRole="button" style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 16 }}>
-          <T size={15} color={INK.muted}>
-            Browse dishes
-          </T>
         </Pressable>
       </View>
     </View>

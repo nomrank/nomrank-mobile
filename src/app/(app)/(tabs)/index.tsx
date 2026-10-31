@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,7 +14,8 @@ import { LogoMark } from "@/components/logo-mark";
 import { DietMark, DishAvg } from "@/components/marks";
 import { CityPicker, MealCard, ReviewCard, useGo } from "@/components/social";
 import { FirstTour, StartSpace } from "@/components/home-parts";
-import { dishCount, Empty, Failed, Input, Overline, Row, SortRow, T, TabRow, useData, WORDMARK } from "@/components/ui";
+import { FoxLoader } from "@/components/loader";
+import { dishCount, Empty, Failed, Input, Loading, Overline, Rise, Row, SortRow, T, TabRow, useData, WORDMARK } from "@/components/ui";
 import { FIRST_LIST_KEY, groupBy, groupDishes, type DishGroup } from "@/lib/home";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -104,7 +105,7 @@ export default function Home() {
   const go = useGo();
   const [view, setView] = useState<View_>("takes");
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<FeedSort>(prefs.feed_default === "following" && !userId ? "new" : prefs.feed_default);
+  const [sort, setSort] = useState<FeedSort>(prefs.feed_default);
   const q = dishKey(query);
   const show: ShowDiet = prefs.show_diet;
 
@@ -208,7 +209,7 @@ export default function Home() {
     }
     if (view === "takes") {
       if (feedFailed) return [{ key: "fail", node: () => <Failed onRetry={first} /> }];
-      if (!reviews) return [{ key: "wait", node: () => <ActivityIndicator style={{ marginTop: 40 }} color={brand.mustard} /> }];
+      if (!reviews) return [{ key: "wait", node: () => <Loading /> }];
       if (!reviews.length)
         return [{ key: "none", node: () => <Empty title={sort === "following" ? "Nothing from your people yet" : "No takes yet"}>{sort === "following" ? "Follow people from their profiles and their takes land here." : "Rate a dish and write what you thought. It shows up here."}</Empty> }];
       return groupMeals(reviews).map((meal) => ({
@@ -221,7 +222,7 @@ export default function Home() {
       }));
     }
     if (browse.failed && !browse.data) return [{ key: "fail", node: () => <Failed onRetry={browse.reload} /> }];
-    if (!browse.data) return [{ key: "wait", node: () => <ActivityIndicator style={{ marginTop: 40 }} color={brand.mustard} /> }];
+    if (!browse.data) return [{ key: "wait", node: () => <Loading /> }];
     if (view === "rankings") {
       const rows: Item[] = leaders.length ? leaders.map((l) => ({ key: l.list.id, node: () => <RankingRow item={l} /> })) : [{ key: "none", node: () => <Empty>No rankings yet. They fill in as people rate.</Empty> }];
       return profile ? [...rows, { key: "start", node: () => <StartSpace /> }] : rows;
@@ -239,7 +240,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `go` is stable in effect
   }, [q, view, reviews, votes, feedFailed, sort, restaurants, leaders, browse.data, browse.failed, profile, colors]);
 
-  const renderItem = useCallback(({ item }: { item: Item }) => <>{item.node()}</>, []);
+  const renderItem = useCallback(({ item, index }: { item: Item; index: number }) => <Rise index={index}>{item.node()}</Rise>, []);
 
   return (
     <View style={{ flex: 1, paddingTop: top }}>
@@ -255,7 +256,7 @@ export default function Home() {
         removeClippedSubviews
         windowSize={9}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={brand.mustard} colors={[brand.ketchup]} />}
-        ListFooterComponent={more ? <ActivityIndicator style={{ margin: 16 }} color={brand.mustard} accessibilityLabel="Loading more takes" /> : done && view === "takes" && !q && (reviews?.length ?? 0) > FEED_PAGE ? <T size={14} color={colors.faint} style={{ textAlign: "center", padding: 16 }}>You&apos;re all caught up.</T> : undefined}
+        ListFooterComponent={more ? <View style={{ alignItems: "center", padding: 16 }}><FoxLoader size={40} /></View> : done && view === "takes" && !q && (reviews?.length ?? 0) > FEED_PAGE ? <T size={14} color={colors.faint} style={{ textAlign: "center", padding: 16 }}>You&apos;re all caught up.</T> : undefined}
         ListHeaderComponent={
           <View style={{ gap: 12 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 8 }}>
@@ -289,7 +290,7 @@ export default function Home() {
               )}
             </View>
             {!q && <TabRow tabs={TABS} value={view} onChange={setView} />}
-            {!q && view === "takes" && <SortRow options={profile ? (["new", "top", "following"] as const) : (["new", "top"] as const)} value={sort} onChange={setSort} />}
+            {!q && view === "takes" && <SortRow options={["new", "top", "following"] as const} value={sort} onChange={setSort} />}
           </View>
         }
       />

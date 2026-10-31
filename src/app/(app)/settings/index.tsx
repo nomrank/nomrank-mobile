@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Linking as ExpoLinking, Pressable, ScrollView, View } from "react-native";
+import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
 import { DownloadIcon, ExternalLinkIcon, LogOutIcon, MonitorIcon, MoonIcon, PencilIcon, SunIcon, type LucideIcon } from "lucide-react-native";
@@ -43,6 +44,31 @@ function ThemeSwitch() {
         </Pressable>
       ))}
     </View>
+  );
+}
+
+// Shows whether phone notifications are on. Once Android has been told no, only its own settings can turn them back on.
+function NotificationsRow() {
+  const { colors } = useTheme();
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then((p) => setOn(p.granted));
+  }, []);
+  async function turnOn() {
+    const p = await Notifications.requestPermissionsAsync();
+    setOn(p.granted);
+    if (!p.granted && !p.canAskAgain) ExpoLinking.openSettings();
+  }
+  return (
+    <Card style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <View style={{ flex: 1 }}>
+        <T weight={600}>Notifications</T>
+        <T size={14} color={colors.muted}>
+          {on ? "On. You'll hear about votes, comments and follows." : "Off. Turn them on to hear about votes, comments and follows."}
+        </T>
+      </View>
+      {on === false && <Btn label="Turn on" variant="secondary" onPress={turnOn} style={{ minHeight: 40 }} />}
+    </Card>
   );
 }
 
@@ -157,6 +183,7 @@ export default function Settings() {
             <ThemeSwitch />
           </View>
         </Card>
+        <NotificationsRow />
         <Card style={{ gap: 10 }}>
           <Overline>Preferences</Overline>
           <Preferences />

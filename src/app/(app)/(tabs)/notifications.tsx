@@ -7,7 +7,7 @@ import { describe, getNotifications, type Notification } from "@/core/notificati
 import { timeAgo } from "@/core/time";
 import { AgreeIcon, Avatar } from "@/components/marks";
 import { useGo } from "@/components/social";
-import { Empty, Failed, Loading, T, useData } from "@/components/ui";
+import { Empty, Failed, Loading, Rise, T, useData } from "@/components/ui";
 import { markAllRead } from "@/lib/actions";
 import { useActivity } from "@/lib/activity";
 import { useSession } from "@/lib/session";
@@ -67,7 +67,7 @@ export default function Activity() {
     if (data?.some((n) => !n.read_at) && userId) markAllRead(userId).then(() => refresh());
   }, [data, userId, refresh]);
 
-  const renderItem = useCallback(({ item }: { item: Notification }) => <Item n={item} />, []);
+  const renderItem = useCallback(({ item, index }: { item: Notification; index: number }) => <Rise index={index}><Item n={item} /></Rise>, []);
   return (
     <View style={{ flex: 1, paddingTop: top }}>
       <T size={22} weight={800} accessibilityRole="header" style={{ paddingHorizontal: 20, paddingVertical: 12 }}>

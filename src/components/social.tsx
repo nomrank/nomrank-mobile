@@ -1,10 +1,10 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { FlatList, Pressable, ScrollView, Share, useWindowDimensions, View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { BookmarkIcon, CheckIcon, FlagIcon, MapPinIcon, MessageCircleIcon, Share2Icon, UserPlusIcon } from "lucide-react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { CITIES, type City } from "@/core/cities";
 import { dishHref } from "@/core/dishes";
 import { photoUrl, type Review, type Vote } from "@/core/ratings";
@@ -24,29 +24,51 @@ export const useGo = () => {
   return (href: string) => router.push(href as Href);
 };
 
+// A few crumbs thrown off the button. Transform and opacity only.
+function Crumb({ angle, color, left }: { angle: number; color: string; left: number }) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) });
+  }, [t]);
+  const style = useAnimatedStyle(() => ({ opacity: 1 - t.value, transform: [{ translateX: Math.cos(angle) * 30 * t.value }, { translateY: Math.sin(angle) * 30 * t.value }, { scale: 1 - t.value * 0.5 }] }));
+  return <Animated.View style={[{ position: "absolute", left, top: 16, width: 6, height: 6, borderRadius: 3, backgroundColor: color }, style]} />;
+}
+
+function Crumbs({ color, left }: { color: string; left: number }) {
+  const reduce = useReducedMotion();
+  if (reduce) return null;
+  return (
+    <>
+      {[-2.6, -2, -1.5, -1.1, -0.5, 0.2].map((a) => (
+        <Crumb key={a} angle={a} color={color} left={left} />
+      ))}
+    </>
+  );
+}
+
 const SIDES = [
   { kind: "facts" as const, label: "Agree", Icon: AgreeIcon, fill: brand.mustard },
   { kind: "cap" as const, label: "Disagree", Icon: DisagreeIcon, fill: brand.ketchup },
 ];
 
-// Agree | Disagree as one joined control, and a quiet line for the winning side. Signed out, it leads to sign-in; on your
-// own take it only shows the counts. The tap answers at once; the server catches up.
-export function VoteButtons({ ratingId, facts, cap, mine, mode }: { ratingId: string; facts: number; cap: number; mine?: Vote; mode: "vote" | "signed-out" | "own" }) {
+// Agree | Disagree as one joined control, and a quiet line for the winning side. On your own take it only shows the
+// counts. The tap answers at once with a pop, a few crumbs and a rolling count; the server catches up.
+export function VoteButtons({ ratingId, facts, cap, mine, mode }: { ratingId: string; facts: number; cap: number; mine?: Vote; mode: "vote" | "own" }) {
   const { colors } = useTheme();
-  const go = useGo();
   const [state, setState] = useState<VoteState>({ facts, cap, mine });
   const pop = useSharedValue(1);
+  const [burst, setBurst] = useState<{ id: number; color: string; left: number } | null>(null);
   const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
   const lead = leadingSide(state.facts, state.cap);
 
   function press(kind: Vote) {
-    if (mode === "signed-out") return go("/login");
     if (mode === "own") return;
     const next = applyVote(state, kind);
     setState(next);
     if (next.mine) {
       Haptics.selectionAsync();
       pop.value = withSequence(withTiming(1.08, { duration: 90 }), withTiming(1, { duration: 140 }));
+      setBurst({ id: Date.now(), color: kind === "facts" ? brand.mustard : brand.ketchup, left: kind === "facts" ? 30 : 100 });
     }
     castVote(ratingId, next.mine ?? null);
   }
@@ -64,18 +86,23 @@ export function VoteButtons({ ratingId, facts, cap, mine, mode }: { ratingId: st
               onPress={() => press(kind)}
               disabled={mode === "own"}
               accessibilityRole="button"
-              accessibilityLabel={`${label}, ${count}${mode === "signed-out" ? ". Sign in to vote" : ""}`}
+              accessibilityLabel={`${label}, ${count}`}
               accessibilityState={{ selected: on }}
               style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, minWidth: 64, justifyContent: "center", backgroundColor: on ? fill : "transparent", borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.hairline }}
             >
               <Icon color={ink} />
-              <T size={13} weight={600} color={on ? brand.studio : colors.faint}>
-                {count}
-              </T>
+              <View style={{ overflow: "hidden" }}>
+                <Animated.View key={count} entering={FadeInDown.duration(170)}>
+                  <T size={13} weight={600} color={on ? brand.studio : colors.faint}>
+                    {count}
+                  </T>
+                </Animated.View>
+              </View>
             </Pressable>
           );
         })}
       </Animated.View>
+      {!!burst && <Crumbs key={burst.id} color={burst.color} left={burst.left} />}
       {lead && (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.hairline, overflow: "hidden" }}>
@@ -143,7 +170,7 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
   const { width } = useWindowDimensions();
   const go = useGo();
   const viewer = profile?.username ?? null;
-  const mode = !viewer ? "signed-out" : viewer === r.author.username ? "own" : "vote";
+  const mode = viewer === r.author.username ? "own" : "vote";
   const place = r.dish.restaurant;
   const byline = (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -260,14 +287,11 @@ export function MealCard({ reviews, votes }: { reviews: Review[]; votes: Record<
   );
 }
 
-// "Want to try": a bookmark on feed cards, spelled out on a dish page. Signed out, it leads to sign-in.
+// "Want to try": a bookmark on feed cards, spelled out on a dish page.
 export function SaveButton({ dishId, saved: initial, compact }: { dishId: string; saved: boolean; compact?: boolean }) {
   const { colors } = useTheme();
-  const { profile } = useSession();
-  const go = useGo();
   const [saved, set] = useState(initial);
   function press() {
-    if (!profile) return go("/login");
     set(!saved);
     Haptics.selectionAsync();
     setSaved(dishId, !saved).catch(() => {
@@ -288,11 +312,8 @@ export function SaveButton({ dishId, saved: initial, compact }: { dishId: string
 }
 
 export function FollowButton({ followeeId, handle, following: initial, onChange }: { followeeId: string; handle: string; following: boolean; onChange?: (f: boolean) => void }) {
-  const { profile } = useSession();
-  const go = useGo();
   const [following, set] = useState(initial);
   function press() {
-    if (!profile) return go("/login");
     set(!following);
     onChange?.(!following);
     setFollow(followeeId, !following).catch(() => {
@@ -315,8 +336,6 @@ export function ShareButton({ path, title }: { path: string; title: string }) {
 // Report a take, comment, dish or list: the reasons differ by what's being reported, as in the database check.
 export function ReportButton({ targetType, targetId, what }: { targetType: ReportTarget; targetId: string; what: string }) {
   const { colors } = useTheme();
-  const { profile } = useSession();
-  const go = useGo();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
@@ -336,7 +355,7 @@ export function ReportButton({ targetType, targetId, what }: { targetType: Repor
 
   return (
     <>
-      <Pressable onPress={() => (profile ? setOpen(true) : go("/login"))} accessibilityRole="button" accessibilityLabel={`Report ${what}`} style={{ minHeight: 40, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 6 }}>
+      <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={`Report ${what}`} style={{ minHeight: 40, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 6 }}>
         <FlagIcon size={14} color={colors.muted} />
         <T size={13} weight={500} color={colors.muted}>
           Report

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import { Image } from "expo-image";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
 import { ChevronRightIcon, ClockIcon, TrophyIcon } from "lucide-react-native";
 import { dishHref, keyFromDishSlug } from "@/core/dishes";
@@ -132,7 +133,7 @@ export default function DishScreen() {
               </View>
               <View accessibilityLabel={`Scores: ${spread.map((n, i) => `${n} rated ${i + 1}`).join(", ")}`} style={{ flex: 1, height: 56, flexDirection: "row", alignItems: "flex-end", gap: 3 }}>
                 {spread.map((n, i) => (
-                  <View key={i} style={{ flex: 1, height: Math.max(3, (n / peak) * 56), borderTopLeftRadius: 2, borderTopRightRadius: 2, backgroundColor: colors.faint, opacity: 0.55 }} />
+                  <Animated.View key={i} entering={FadeInDown.duration(300).delay(i * 25)} style={{ flex: 1, height: Math.max(3, (n / peak) * 56), borderTopLeftRadius: 2, borderTopRightRadius: 2, backgroundColor: colors.faint, opacity: 0.55 }} />
                 ))}
               </View>
             </View>
@@ -151,7 +152,7 @@ export default function DishScreen() {
             )}
 
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <Btn label={!profile ? "Sign in to rate" : mine ? `You rated it ${formatScore(mine.score)} · Change` : "Rate this dish"} onPress={() => go(profile ? `/rate?dish=${dish.id}` : "/login")} style={{ flex: 1 }} />
+              <Btn label={mine ? `You rated it ${formatScore(mine.score)} · Change` : "Rate this dish"} onPress={() => go(`/rate?dish=${dish.id}`)} style={{ flex: 1 }} />
               {!mine && <SaveButton key={String(saved)} dishId={dish.id} saved={Boolean(saved)} />}
             </View>
             {next && <RateAnother restaurant={next.restaurant} dishes={next.dishes} />}

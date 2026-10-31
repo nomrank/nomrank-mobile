@@ -68,7 +68,7 @@ function AddDish({ restaurant: r }: { restaurant: Restaurant }) {
 export default function RestaurantScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { colors } = useTheme();
-  const { profile, prefs } = useSession();
+  const { prefs } = useSession();
   const go = useGo();
   const { data, failed, reload } = useData(() => getRestaurant(supabase, slug), [slug]);
   const r = data && filterMenus([data], prefs.show_diet)[0];
@@ -112,7 +112,7 @@ export default function RestaurantScreen() {
           ListEmptyComponent={<Empty>No dishes yet. Add the one you came for.</Empty>}
           ListFooterComponent={
             <View style={{ marginTop: 16 }}>
-              {profile ? <AddDish restaurant={r} /> : <Btn label="Sign in to add a dish" variant="secondary" onPress={() => go("/login")} />}
+              <AddDish restaurant={r} />
             </View>
           }
         />

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { EyeIcon, EyeOffIcon, MailCheckIcon } from "lucide-react-native";
 import Svg, { Path } from "react-native-svg";
@@ -27,7 +26,6 @@ function GoogleMark() {
 // Email and password or Google, like the web app. Confirmation and reset links finish on the website.
 export default function Login() {
   const { colors } = useTheme();
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -141,7 +139,6 @@ export default function Login() {
             </T>
             .
           </T>
-          {router.canGoBack() && <Btn label="Keep browsing" variant="ghost" onPress={() => router.back()} />}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -12,6 +12,7 @@ import { DMSerifDisplay_400Regular } from "@expo-google-fonts/dm-serif-display";
 import { Loader } from "@/components/loader";
 import { Toaster } from "@/components/toast";
 import { IntroContext, INTRO_KEY, PERMISSIONS_KEY } from "@/lib/intro";
+import "@/lib/notify"; // defines the background check at launch, including when Android starts the app just for it
 import { SessionProvider, useSession } from "@/lib/session";
 import { ThemeProvider, useTheme } from "@/theme";
 
@@ -34,16 +35,13 @@ export default function RootLayout() {
   );
 }
 
-// First run: the landing screens, then sign-in. Then whichever gate applies: finish your profile, a suspended account,
-// the permissions ask, and finally the app. Signed out after the landing screens you can browse; anything that writes leads
-// to sign-in. Each guard is what the web app's redirects do on every request.
+// First run: the landing screens, then sign-in, which is required. Then whichever gate applies: finish your profile, a
+// suspended account, the permissions ask, and finally the app.
 function Routes() {
   const { ready, session, profile } = useSession();
   const { colors, scheme } = useTheme();
-  const router = useRouter();
   const [seen, setSeen] = useState<boolean | null>(null);
   const [asked, setAsked] = useState(true);
-  const [wantLogin, setWantLogin] = useState(false);
 
   useEffect(() => {
     AsyncStorage.multiGet([INTRO_KEY, PERMISSIONS_KEY]).then(([[, intro], [, perms]]) => {
@@ -52,26 +50,19 @@ function Routes() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!wantLogin || !seen) return;
-    setWantLogin(false);
-    router.push("/login");
-  }, [wantLogin, seen, router]);
-
   if (!ready || seen === null) return <Loader />;
 
   const needsProfile = Boolean(session && !profile);
   const banned = Boolean(profile?.banned_at);
   const askPermissions = Boolean(profile && !banned && !asked);
-  const inApp = seen && !needsProfile && !banned && !askPermissions;
+  const inApp = seen && Boolean(session) && !needsProfile && !banned && !askPermissions;
 
   return (
     <IntroContext.Provider
       value={{
-        finishIntro: (login) => {
+        finishIntro: () => {
           AsyncStorage.setItem(INTRO_KEY, "1");
           setSeen(true);
-          setWantLogin(login);
         },
         finishPermissions: () => {
           AsyncStorage.setItem(PERMISSIONS_KEY, "1");
@@ -98,7 +89,7 @@ function Routes() {
             <Stack.Screen name="(app)" />
           </Stack.Protected>
           <Stack.Protected guard={seen && !session}>
-            <Stack.Screen name="login" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+            <Stack.Screen name="login" />
           </Stack.Protected>
         </Stack>
         <Toaster />

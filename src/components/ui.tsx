@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { ActivityIndicator, Modal, Pressable, Text, TextInput, View, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle } from "react-native";
+import { Modal, Pressable, Text, TextInput, View, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import { FoxLoader } from "./loader";
 import { brand, useTheme } from "@/theme";
 
 export const FONT = { 400: "Geist_400Regular", 500: "Geist_500Medium", 600: "Geist_600SemiBold", 700: "Geist_700Bold", 800: "Geist_800ExtraBold" } as const;
@@ -12,6 +14,34 @@ export const SERIF = "DMSerifDisplay_400Regular";
 type TProps = TextProps & { size?: number; weight?: keyof typeof FONT; color?: string; style?: StyleProp<TextStyle> };
 
 // All text: Geist at a size and weight, in the theme's foreground unless told otherwise.
+const APressable = Animated.createAnimatedComponent(Pressable);
+
+// A pressable that gives under the finger: quick down, a little slower back.
+export function Press({ style, onPressIn, onPressOut, to = 0.97, ...rest }: Omit<PressableProps, "style"> & { style?: StyleProp<ViewStyle>; to?: number }) {
+  const scale = useSharedValue(1);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <APressable
+      {...rest}
+      onPressIn={(e) => {
+        scale.value = withTiming(to, { duration: 90 });
+        onPressIn?.(e);
+      }}
+      onPressOut={(e) => {
+        scale.value = withTiming(1, { duration: 170 });
+        onPressOut?.(e);
+      }}
+      style={[style, anim]}
+    />
+  );
+}
+
+// Rows rise in one after another when a list opens. Only the first few, so scrolling never waits.
+export function Rise({ index, children }: { index: number; children: ReactNode }) {
+  if (index > 8) return <>{children}</>;
+  return <Animated.View entering={FadeInDown.duration(300).delay(index * 35)}>{children}</Animated.View>;
+}
+
 export function T({ size = 15, weight = 400, color, style, ...rest }: TProps) {
   const { colors } = useTheme();
   return <Text {...rest} style={[{ fontFamily: FONT[weight], fontSize: size, lineHeight: Math.round(size * 1.35), color: color ?? colors.foreground }, style]} />;
@@ -39,23 +69,23 @@ export function Btn({ label, variant = "primary", busy, icon: Icon, disabled, st
   const fill = variant === "primary" ? brand.ketchup : variant === "secondary" ? colors.raised : variant === "danger" ? colors.destructive : "transparent";
   const ink = variant === "primary" || variant === "danger" ? brand.studio : colors.foreground;
   return (
-    <Pressable
+    <Press
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
       disabled={disabled || busy}
-      style={({ pressed }) => [
-        { minHeight: 48, paddingHorizontal: 18, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: fill, opacity: disabled ? 0.5 : pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+      style={[
+        { minHeight: 48, paddingHorizontal: 18, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: fill, opacity: disabled ? 0.5 : 1 },
         variant === "secondary" && { borderWidth: 1, borderColor: colors.hairline },
         style,
       ]}
       {...rest}
     >
-      {busy ? <ActivityIndicator size="small" color={ink} /> : Icon ? <Icon size={18} color={ink} /> : null}
+      {busy ? <FoxLoader size={24} /> : Icon ? <Icon size={18} color={ink} /> : null}
       <T size={15} weight={600} color={ink}>
         {label}
       </T>
-    </Pressable>
+    </Press>
   );
 }
 
@@ -74,33 +104,55 @@ export function Input({ style, ...rest }: TextInputProps) {
 export function Chip({ label, on, onPress, icon }: { label: string; on?: boolean; onPress?: () => void; icon?: ReactNode }) {
   const { colors } = useTheme();
   return (
-    <Pressable
+    <Press
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: !!on }}
+      to={0.95}
       style={{ minHeight: 40, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 6, borderColor: on ? brand.mustard : colors.hairline, backgroundColor: on ? "rgba(255,194,60,0.15)" : "transparent" }}
     >
       {icon}
       <T size={14} weight={600} color={on ? colors.foreground : colors.muted}>
         {label}
       </T>
-    </Pressable>
+    </Press>
   );
 }
 
 // Underlined text tabs, like the web's Takes / Rankings row.
 export function TabRow<K extends string>({ tabs, value, onChange }: { tabs: readonly (readonly [K, string])[]; value: K; onChange: (k: K) => void }) {
   const { colors } = useTheme();
+  const spots = useRef<Record<string, { x: number; width: number }>>({});
+  const x = useSharedValue(0);
+  const width = useSharedValue(0);
+  const line = useAnimatedStyle(() => ({ width: width.value, transform: [{ translateX: x.value }] }));
+  const move = (k: K, jump: boolean) => {
+    const s = spots.current[k];
+    if (!s) return;
+    x.value = jump ? s.x : withSpring(s.x, { damping: 20, stiffness: 240 });
+    width.value = jump ? s.width : withSpring(s.width, { damping: 20, stiffness: 240 });
+  };
+  useEffect(() => move(value, false), [value]); // eslint-disable-line react-hooks/exhaustive-deps -- shared values are stable
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: "row", gap: 22, borderBottomWidth: 1, borderBottomColor: colors.hairline }}>
       {tabs.map(([k, label]) => (
-        <Pressable key={k} onPress={() => onChange(k)} accessibilityRole="tab" accessibilityState={{ selected: value === k }} style={{ minHeight: 44, justifyContent: "center" }}>
+        <Pressable
+          key={k}
+          onPress={() => onChange(k)}
+          onLayout={(e) => {
+            spots.current[k] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
+            if (k === value) move(k, true);
+          }}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: value === k }}
+          style={{ minHeight: 44, justifyContent: "center" }}
+        >
           <T size={14} weight={600} color={value === k ? colors.foreground : colors.muted}>
             {label}
           </T>
-          {value === k && <View style={{ position: "absolute", left: 0, right: 0, bottom: -1, height: 2, borderRadius: 2, backgroundColor: brand.mustard }} />}
         </Pressable>
       ))}
+      <Animated.View style={[{ position: "absolute", left: 0, bottom: -1, height: 2, borderRadius: 2, backgroundColor: brand.mustard }, line]} />
     </View>
   );
 }
@@ -147,7 +199,7 @@ export function Header({ title, right }: { title?: string; right?: ReactNode }) 
 export function Loading() {
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}>
-      <ActivityIndicator color={brand.mustard} accessibilityLabel="Loading" />
+      <FoxLoader size={84} />
     </View>
   );
 }
@@ -183,7 +235,7 @@ export function Empty({ title, children }: { title?: string; children?: ReactNod
 export function Row({ onPress, label, title, meta, leading }: { onPress: () => void; label?: string; title: ReactNode; meta?: ReactNode; leading?: ReactNode }) {
   const { colors } = useTheme();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ minHeight: 64, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, opacity: pressed ? 0.7 : 1, borderBottomWidth: 1, borderBottomColor: colors.hairline })}>
+    <Press onPress={onPress} accessibilityRole="button" to={0.985} style={{ minHeight: 64, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline }}>
       {leading}
       <View style={{ flex: 1, minWidth: 0 }}>
         {label && (
@@ -195,7 +247,7 @@ export function Row({ onPress, label, title, meta, leading }: { onPress: () => v
         {meta && (typeof meta === "string" ? <T size={14} color={colors.muted}>{meta}</T> : meta)}
       </View>
       <ChevronRightIcon size={20} color={colors.foreground} />
-    </Pressable>
+    </Press>
   );
 }
 

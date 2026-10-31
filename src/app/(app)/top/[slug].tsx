@@ -8,7 +8,7 @@ import { dishHref } from "@/core/dishes";
 import { getList, getListedDishes, getLists, getRankedList, getRankings, listLeaders, type FoodList, type RankedDish } from "@/core/rankings";
 import { DietMark, DishAvg, TastesLikeHome } from "@/components/marks";
 import { CityPicker, ReportButton, ShareButton, useGo } from "@/components/social";
-import { Btn, Card, dishCount, Empty, Failed, Header, Loading, Overline, T, useData } from "@/components/ui";
+import { Btn, Card, dishCount, Empty, Failed, Header, Loading, Overline, Rise, T, useData } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { SITE, supabase } from "@/lib/supabase";
 import { useTheme } from "@/theme";
@@ -79,7 +79,7 @@ function HowItWorks({ list }: { list: FoodList }) {
 export default function Ranking() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { colors } = useTheme();
-  const { profile, city, prefs } = useSession();
+  const { city, prefs } = useSession();
   const go = useGo();
   const { data, failed, reload } = useData(async () => {
     const list = await getList(supabase, decodeURIComponent(slug));
@@ -98,7 +98,7 @@ export default function Ranking() {
   }, [data, city, prefs.show_diet]);
 
   const list = data?.list;
-  const renderItem = useCallback(({ item }: { item: RankedDish }) => <RankRow dish={item} demonym={list?.region?.demonym} />, [list]);
+  const renderItem = useCallback(({ item, index }: { item: RankedDish; index: number }) => <Rise index={index}><RankRow dish={item} demonym={list?.region?.demonym} /></Rise>, [list]);
 
   if (failed && !data) return <><Header /><Failed onRetry={reload} /></>;
   if (!data) return <><Header /><Loading /></>;
@@ -160,7 +160,7 @@ export default function Ranking() {
               </View>
             )}
             <HowItWorks list={list} />
-            <Btn label="Rate what you ate" icon={PlusIcon} onPress={() => go(profile ? "/rate" : "/login")} />
+            <Btn label="Rate what you ate" icon={PlusIcon} onPress={() => go("/rate")} />
             {view.others.length > 0 && (
               <View>
                 <Overline>More rankings</Overline>

@@ -49,13 +49,11 @@ function Composer({ ratingId, parentId, placeholder, onPosted, onCancel }: { rat
 }
 
 // One score per comment: likes minus dislikes, between an up and a down arrow.
-function CommentVotes({ comment: c, mine, mode }: { comment: Comment; mine?: CommentVote; mode: "vote" | "signed-out" | "own" }) {
+function CommentVotes({ comment: c, mine, mode }: { comment: Comment; mine?: CommentVote; mode: "vote" | "own" }) {
   const { colors } = useTheme();
-  const go = useGo();
   const [state, setState] = useState({ counts: { like: c.like_count, dislike: c.dislike_count }, mine });
   const score = state.counts.like - state.counts.dislike;
   function press(kind: CommentVote) {
-    if (mode === "signed-out") return go("/login");
     if (mode === "own") return;
     const next = toggleVote(state.counts, state.mine, kind);
     setState(next);
@@ -110,7 +108,7 @@ function CommentItem({ comment: c, mine, onReply, onChange }: { comment: Comment
       </View>
       <T style={{ paddingLeft: 32, lineHeight: 22 }}>{c.body}</T>
       <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: 24, flexWrap: "wrap" }}>
-        <CommentVotes comment={c} mine={mine} mode={!viewer ? "signed-out" : own ? "own" : "vote"} />
+        <CommentVotes comment={c} mine={mine} mode={own ? "own" : "vote"} />
         {onReply && (
           <Pressable onPress={onReply} accessibilityRole="button" style={{ minHeight: 36, paddingHorizontal: 8, justifyContent: "center" }}>
             <T size={14} weight={500} color={colors.muted}>
@@ -133,18 +131,16 @@ function CommentItem({ comment: c, mine, onReply, onChange }: { comment: Comment
 
 function Comments({ ratingId, threads, votes, onChange }: { ratingId: string; threads: Thread[]; votes: Record<string, CommentVote>; onChange: () => void }) {
   const { colors } = useTheme();
-  const { profile } = useSession();
-  const go = useGo();
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const total = threads.reduce((n, t) => n + 1 + t.replies.length, 0);
   return (
     <View style={{ borderTopWidth: 1, borderTopColor: colors.hairline, paddingTop: 16, gap: 12 }}>
       <Overline>Comments{total > 0 ? ` · ${total}` : ""}</Overline>
-      {profile ? <Composer ratingId={ratingId} placeholder="Add a comment" onPosted={onChange} /> : <Btn label="Sign in to join in" variant="secondary" onPress={() => go("/login")} />}
+      <Composer ratingId={ratingId} placeholder="Add a comment" onPosted={onChange} />
       {threads.length ? (
         threads.map((t) => (
           <View key={t.id} style={{ paddingVertical: 6 }}>
-            <CommentItem comment={t} mine={votes[t.id]} onChange={onChange} onReply={profile ? () => setReplyTo(replyTo === t.id ? null : t.id) : undefined} />
+            <CommentItem comment={t} mine={votes[t.id]} onChange={onChange} onReply={() => setReplyTo(replyTo === t.id ? null : t.id)} />
             {(t.replies.length > 0 || replyTo === t.id) && (
               <View style={{ marginTop: 8, marginLeft: 14, paddingLeft: 14, borderLeftWidth: 1, borderLeftColor: colors.hairline, gap: 10 }}>
                 {t.replies.map((r) => (

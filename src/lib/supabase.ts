@@ -14,5 +14,7 @@ AppState.addEventListener("change", (state) => {
   else supabase.auth.stopAutoRefresh();
 });
 
-// Where links people share and open in a browser point. Legal pages live on the web so the wording stays in one place.
-export const SITE = process.env.EXPO_PUBLIC_SITE_URL ?? "https://beta.nomrank.in";
+// Where people land from legal links and shared links.
+export const SITE = "https://www.nomrank.in";
+// Email links need a site that serves /auth/confirm. The main site doesn't until launch, so they stay on beta.
+export const AUTH_SITE = "https://beta.nomrank.in";

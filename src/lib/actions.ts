@@ -13,12 +13,12 @@ import type { FeedDefault, Visibility } from "@/core/profiles";
 import { getStanding, type Standing } from "@/core/rankings";
 import type { Vote } from "@/core/ratings";
 import { commentSchema, dishNameSchema, emailSchema, favouritesSchema, passwordSchema, profileSchema, ratingSchema, reportSchema, signupDetailsSchema, spaceNameSchema, usernameSchema } from "@/core/validation";
-import { SITE, supabase } from "./supabase";
+import { AUTH_SITE, supabase } from "./supabase";
 
 // The web app's server actions, as calls from the phone. The same checks run first, and the database has the last word
 // (RLS, rate limits, ban checks), so nothing here is trusted more than the website is.
 
-const confirmUrl = `${SITE}/auth/confirm`; // email links finish on the website, then you sign in here
+const confirmUrl = `${AUTH_SITE}/auth/confirm`; // email links finish on the website, then you sign in here
 
 export type AuthResult = { error?: string; sent?: "confirm" | "reset" };
 
