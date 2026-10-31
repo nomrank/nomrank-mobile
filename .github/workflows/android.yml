@@ -35,6 +35,15 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Gradle downloads and compiles are the slow part of a build; keep them between runs.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
       - run: npm ci
 
       - name: Typecheck
