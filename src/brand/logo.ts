@@ -1,4 +1,3 @@
-// Copied from nomrank-web apps/web/lib/logo.ts (without the SVG-string helpers). Keep in sync when the logo changes.
 // The Nomrank mark: the fox with the OK hand and the sparkle (the owner's artwork, 2026-10-31), traced into vectors so it
 // stays sharp at any size. Each piece is its own path, so the loader can move them separately. Everything that shows the
 // logo (the app header, the favicon, the share card, the email image, the loader) draws from these paths.

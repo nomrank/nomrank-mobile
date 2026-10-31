@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { T } from "./ui";
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import { LogoMark } from "./logo-mark";
 import { useTheme } from "@/theme";
@@ -19,12 +20,11 @@ export function Loader({ label = "Loading" }: { label?: string }) {
       <Animated.View style={style}>
         <LogoMark size={88} />
       </Animated.View>
-      <Text style={[styles.label, { color: colors.muted }]}>{label}…</Text>
+      <T size={14} color={colors.muted}>{label}…</T>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16 },
-  label: { fontSize: 14 },
 });

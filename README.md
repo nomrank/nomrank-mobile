@@ -1,6 +1,6 @@
 # Nomrank mobile
 
-Android app for [Nomrank](https://beta.nomrank.in): rate the dish, not the place. Version 0.1.0 is the first test build: sign in or create an account, light and dark theme, and the ranked dishes of every food list.
+Android app for [Nomrank](https://beta.nomrank.in): rate the dish, not the place. Version 0.1.0 is the first test build, with the whole consumer app: landing screens, sign-in, the feed, rankings, rating, battles, profiles, activity and settings.
 
 ## Run it on your phone
 
@@ -10,15 +10,7 @@ Android app for [Nomrank](https://beta.nomrank.in): rate the dish, not the place
 
 ## Install a test APK
 
-```
-npm install -g eas-cli
-eas login
-eas env:create --environment preview --name EXPO_PUBLIC_SUPABASE_URL --value "<url>" --visibility plaintext
-eas env:create --environment preview --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --value "<publishable key>" --visibility plaintext
-eas build -p android --profile preview
-```
-
-EAS prints a link to the finished `.apk`; open it on the phone and install it. In `eas.json` the preview profile builds an APK, not a Play bundle.
+Every push to `main` builds an APK with GitHub Actions. Open **Releases** on this repo on your phone, signed in to GitHub, and install the newest one. Each build installs over the last.
 
 ## Checks
 

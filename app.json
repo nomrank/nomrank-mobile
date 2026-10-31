@@ -25,6 +25,20 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 160
         }
+      ],
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Nomrank uses your photos so you can add them to your takes and profile.",
+          "cameraPermission": "Nomrank uses your camera so you can snap what you're eating."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#ff4b3a"
+        }
       ]
     ],
     "experiments": {
