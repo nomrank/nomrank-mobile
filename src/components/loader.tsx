@@ -7,9 +7,9 @@ import { brand, useTheme } from "@/theme";
 
 const EASE = Easing.inOut(Easing.quad);
 
-function Layer({ size, style, children }: { size: number; style: ReturnType<typeof useAnimatedStyle>; children: React.ReactNode }) {
+function Layer({ size, style, origin, children }: { size: number; style: ReturnType<typeof useAnimatedStyle>; origin?: string; children: React.ReactNode }) {
   return (
-    <Animated.View style={[{ position: "absolute", width: size, height: size }, style]}>
+    <Animated.View style={[{ position: "absolute", width: size, height: size, transformOrigin: origin }, style]}>
       <Svg width={size} height={size} viewBox={MARK_VIEWBOX}>
         {children}
       </Svg>
@@ -36,8 +36,8 @@ export function FoxLoader({ size = 72 }: { size?: number }) {
   useLoop(wave, 220, 1100, reduce);
   useLoop(glint, 500, 500, reduce);
   const head = useAnimatedStyle(() => ({ transform: [{ translateY: lift.value * -size * 0.05 }] }));
-  const hand = useAnimatedStyle(() => ({ transformOrigin: "82% 90%", transform: [{ rotate: `${wave.value * 12}deg` }] }));
-  const sparkle = useAnimatedStyle(() => ({ transformOrigin: "85% 28%", opacity: 1 - glint.value * 0.5, transform: [{ scale: 1 + glint.value * 0.35 }] }));
+  const hand = useAnimatedStyle(() => ({ transform: [{ rotate: `${wave.value * 12}deg` }] }));
+  const sparkle = useAnimatedStyle(() => ({ opacity: 1 - glint.value * 0.5, transform: [{ scale: 1 + glint.value * 0.35 }] }));
   return (
     <View accessibilityRole="progressbar" accessibilityLabel="Loading" style={{ width: size, height: size }}>
       <Layer size={size} style={head}>
@@ -45,10 +45,10 @@ export function FoxLoader({ size = 72 }: { size?: number }) {
         <Path d={FACE} fill={face} fillRule="evenodd" />
         <Path d={LEAF} fill={face} fillRule="evenodd" />
       </Layer>
-      <Layer size={size} style={hand}>
+      <Layer size={size} style={hand} origin="82% 90%">
         <Path d={HAND} fill={brand.ketchup} fillRule="evenodd" />
       </Layer>
-      <Layer size={size} style={sparkle}>
+      <Layer size={size} style={sparkle} origin="85% 28%">
         <Path d={SPARKLE} fill={brand.mustard} fillRule="evenodd" />
       </Layer>
     </View>
