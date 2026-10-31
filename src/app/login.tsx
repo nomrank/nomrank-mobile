@@ -30,7 +30,7 @@ export default function Login() {
   const input = [styles.input, { backgroundColor: colors.raised, borderColor: colors.input, color: colors.foreground }];
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <LogoMark size={64} />
           <Text style={[styles.title, { color: colors.foreground }]}>

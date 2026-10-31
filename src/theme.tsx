@@ -12,7 +12,7 @@ export const brand = { ketchup: "#ff4b3a", mustard: "#ffc23c", studio: "#17111c"
 export type Choice = "system" | "light" | "dark";
 const KEY = "nomrank-theme";
 
-type Ctx = { colors: (typeof palettes)["dark"] | (typeof palettes)["light"]; scheme: "light" | "dark"; choice: Choice; setChoice: (c: Choice) => void };
+export type Ctx = { colors: (typeof palettes)["dark"] | (typeof palettes)["light"]; scheme: "light" | "dark"; choice: Choice; setChoice: (c: Choice) => void };
 const ThemeContext = createContext<Ctx | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

@@ -1,10 +1,33 @@
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LogoMark } from "@/components/logo-mark";
 import { getLists, getRankedList, type FoodList, type RankedDish } from "@/lib/rankings";
 import { supabase } from "@/lib/supabase";
-import { brand, useTheme, type Choice } from "@/theme";
+import { brand, useTheme, type Choice, type Ctx } from "@/theme";
+
+// One ranked dish. Memoised so scrolling a long list doesn't redraw every row.
+const DishRow = memo(function DishRow({ d, colors }: { d: RankedDish; colors: Ctx["colors"] }) {
+  return (
+    <View style={[styles.row, { backgroundColor: colors.paper, borderColor: colors.hairline }]}>
+      <Text style={[styles.rank, { color: colors.faint }]}>{d.rank ?? "–"}</Text>
+      <View style={{ flex: 1 }}>
+        <Text numberOfLines={1} style={[styles.dish, { color: colors.foreground }]}>
+          {d.name}
+        </Text>
+        <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 13 }}>
+          {d.place} · {d.area}
+        </Text>
+      </View>
+      <View style={{ alignItems: "flex-end" }}>
+        <Text style={[styles.score, { color: colors.foreground }]}>{d.avg_score === null ? "New" : Number(d.avg_score).toFixed(1)}</Text>
+        <Text style={{ color: colors.faint, fontSize: 11 }}>
+          {d.rating_count} {d.rating_count === 1 ? "rating" : "ratings"}
+        </Text>
+      </View>
+    </View>
+  );
+});
 
 const CHOICES: { value: Choice; label: string }[] = [
   { value: "system", label: "Auto" },
@@ -39,6 +62,8 @@ export default function Home() {
       live = false;
     };
   }, [listId]);
+
+  const renderItem = useCallback(({ item }: { item: RankedDish }) => <DishRow d={item} colors={colors} />, [colors]);
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -75,25 +100,9 @@ export default function Home() {
           keyExtractor={(d) => d.id}
           contentContainerStyle={{ padding: 20, gap: 10 }}
           ListEmptyComponent={<Text style={[styles.empty, { color: colors.muted }]}>No dishes in this list yet.</Text>}
-          renderItem={({ item: d }) => (
-            <View style={[styles.row, { backgroundColor: colors.paper, borderColor: colors.hairline }]}>
-              <Text style={[styles.rank, { color: colors.faint }]}>{d.rank ?? "–"}</Text>
-              <View style={{ flex: 1 }}>
-                <Text numberOfLines={1} style={[styles.dish, { color: colors.foreground }]}>
-                  {d.name}
-                </Text>
-                <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 13 }}>
-                  {d.place} · {d.area}
-                </Text>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={[styles.score, { color: colors.foreground }]}>{d.avg_score === null ? "New" : Number(d.avg_score).toFixed(1)}</Text>
-                <Text style={{ color: colors.faint, fontSize: 11 }}>
-                  {d.rating_count} {d.rating_count === 1 ? "rating" : "ratings"}
-                </Text>
-              </View>
-            </View>
-          )}
+          renderItem={renderItem}
+          removeClippedSubviews
+          windowSize={7}
           ListFooterComponent={
             <Pressable onPress={() => supabase.auth.signOut()} accessibilityRole="button" style={styles.signOut}>
               <Text style={{ color: colors.muted, fontWeight: "600" }}>Sign out</Text>
