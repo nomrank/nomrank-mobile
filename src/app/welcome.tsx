@@ -46,8 +46,8 @@ const SLIDES: Slide[] = [
   },
 ];
 
-function PlateArt({ plate, index, scroll, width, height }: { plate: Plate; index: number; scroll: SharedValue<number>; width: number; height: number }) {
-  const size = plate.size * width;
+function PlateArt({ plate, index, scroll, width, height, scale }: { plate: Plate; index: number; scroll: SharedValue<number>; width: number; height: number; scale: number }) {
+  const size = plate.size * width * scale;
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: interpolate(scroll.value / width, [index - 1, index, index + 1], [width * plate.depth, 0, -width * plate.depth]) }],
   }));
@@ -56,7 +56,7 @@ function PlateArt({ plate, index, scroll, width, height }: { plate: Plate; index
       <Image source={plate.photo} contentFit="cover" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 3, borderColor: "#2a2231" }} accessibilityIgnoresInvertColors />
       {plate.score !== undefined && (
         <View style={{ position: "absolute", top: size * 0.02, ...(plate.x + plate.size > 1 ? { left: size * 0.08 } : { right: size * 0.1 }) }}>
-          <Score score={plate.score} size={plate.size > 0.6 ? 64 : 50} />
+          <Score score={plate.score} size={(plate.size > 0.6 ? 64 : 50) * Math.max(scale, 0.8)} />
         </View>
       )}
     </Animated.View>
@@ -97,7 +97,9 @@ export default function Welcome() {
   };
 
   const headline = Math.min(width * 0.2, 84);
-  const artHeight = Math.max(240, height * 0.42);
+  // The plates get whatever the words and the buttons leave, so they never run into the text on a short phone.
+  const artHeight = Math.max(120, height - (top + 68 + headline * 3.1 + 80) - (bottom + 128));
+  const scale = Math.min(1, artHeight / (width * 0.85));
 
   return (
     <View style={{ flex: 1, backgroundColor: INK.background }}>
@@ -122,9 +124,9 @@ export default function Welcome() {
             <T size={16} color={INK.muted} style={{ marginTop: 10, maxWidth: 300, lineHeight: 23 }}>
               {s.text}
             </T>
-            <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: bottom + 128, height: artHeight * 0.74 }}>
+            <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: bottom + 128, height: artHeight }}>
               {s.plates.map((p, n) => (
-                <PlateArt key={n} plate={p} index={i} scroll={scroll} width={width} height={artHeight * 0.74} />
+                <PlateArt key={n} plate={p} index={i} scroll={scroll} width={width} height={artHeight} scale={scale} />
               ))}
               {i === 2 && (
                 <View style={{ position: "absolute", left: 20, bottom: -12, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: INK.raised }}>
