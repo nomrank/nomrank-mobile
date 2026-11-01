@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "791435658273",
+    "project_id": "nomrank-ecdba",
+    "storage_bucket": "nomrank-ecdba.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:791435658273:android:89ca7a18a0137c04f48f60",
+        "android_client_info": {
+          "package_name": "in.nomrank.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB96SbPKXMnVcehZ4emRu-88Tq9v4RaVLI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,7 +3,7 @@ import { AppState, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter, type Href } from "expo-router";
 import { unreadCount } from "@/core/notifications";
-import { notifyNew, watchInBackground } from "./notify";
+import { notifyNew, registerPush, watchInBackground } from "./notify";
 import { useSession } from "./session";
 import { supabase } from "./supabase";
 
@@ -47,6 +47,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (Platform.OS === "web") return;
     watchInBackground().catch(() => {});
+    if (userId) registerPush(userId).catch(() => {});
     const open = (r: Notifications.NotificationResponse | null) => {
       const href = r?.notification.request.content.data?.href;
       if (typeof href === "string") router.push(href as Href);
@@ -58,7 +59,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
     });
     const sub = Notifications.addNotificationResponseReceivedListener(open);
     return () => sub.remove();
-  }, [router]);
+  }, [router, userId]);
 
   return <ActivityContext.Provider value={{ unread, refresh }}>{children}</ActivityContext.Provider>;
 }

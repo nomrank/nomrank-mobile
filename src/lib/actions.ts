@@ -15,6 +15,7 @@ import type { FeedDefault, Visibility } from "@/core/profiles";
 import { getStanding, type Standing } from "@/core/rankings";
 import type { Vote } from "@/core/ratings";
 import { commentSchema, dishNameSchema, emailSchema, favouritesSchema, passwordSchema, profileSchema, ratingSchema, reportSchema, signupDetailsSchema, spaceNameSchema, usernameSchema } from "@/core/validation";
+import { forgetPush } from "./notify";
 import { AUTH_SITE, supabase } from "./supabase";
 
 // The web app's server actions, as calls from the phone. The same checks run first, and the database has the last word
@@ -92,6 +93,7 @@ export async function signInWithGoogle(): Promise<AuthResult> {
 
 // Signing out of Supabase alone leaves Google remembering the account, so the next "Sign in with Google" skips the chooser.
 export async function signOutEverywhere() {
+  await forgetPush().catch(() => {});
   if (Platform.OS === "android") await GoogleSignin.signOut().catch(() => {});
   await supabase.auth.signOut();
 }
