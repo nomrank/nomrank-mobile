@@ -16,6 +16,9 @@ import "@/lib/notify"; // defines the background check at launch, including when
 import { SessionProvider, useSession } from "@/lib/session";
 import { ThemeProvider, useTheme } from "@/theme";
 
+// The emulator smoke test (scripts/smoke.sh) opens every screen without an account; this flag lets it in. Never set in releases.
+const SMOKE = process.env.EXPO_PUBLIC_SMOKE === "1";
+
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -40,7 +43,7 @@ export default function RootLayout() {
 function Routes() {
   const { ready, session, profile } = useSession();
   const { colors, scheme } = useTheme();
-  const [seen, setSeen] = useState<boolean | null>(null);
+  const [seen, setSeen] = useState<boolean | null>(SMOKE ? true : null);
   const [asked, setAsked] = useState(true);
 
   useEffect(() => {
@@ -55,7 +58,7 @@ function Routes() {
   const needsProfile = Boolean(session && !profile);
   const banned = Boolean(profile?.banned_at);
   const askPermissions = Boolean(profile && !banned && !asked);
-  const inApp = seen && Boolean(session) && !needsProfile && !banned && !askPermissions;
+  const inApp = SMOKE || (seen && Boolean(session) && !needsProfile && !banned && !askPermissions);
 
   return (
     <IntroContext.Provider
@@ -88,7 +91,7 @@ function Routes() {
           <Stack.Protected guard={inApp}>
             <Stack.Screen name="(app)" />
           </Stack.Protected>
-          <Stack.Protected guard={seen && !session}>
+          <Stack.Protected guard={!SMOKE && seen && !session}>
             <Stack.Screen name="login" />
           </Stack.Protected>
         </Stack>
