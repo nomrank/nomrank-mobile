@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { Stack, useRouter, type Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Geist_400Regular, Geist_500Medium, Geist_600SemiBold, Geist_700Bold, Geist_800ExtraBold } from "@expo-google-fonts/geist";
 import { PlusJakartaSans_800ExtraBold } from "@expo-google-fonts/plus-jakarta-sans";
 import { DMSerifDisplay_400Regular } from "@expo-google-fonts/dm-serif-display";
+import { InstallSheet } from "@/components/install-sheet";
 import { Loader } from "@/components/loader";
 import { PinchHost } from "@/components/pinch-zoom";
 import { DialogHost } from "@/components/dialog";
@@ -50,7 +51,7 @@ function Routes() {
   useEffect(() => {
     AsyncStorage.multiGet([INTRO_KEY, PERMISSIONS_KEY]).then(([[, intro], [, perms]]) => {
       setSeen(intro === "1");
-      setAsked(perms === "1");
+      setAsked(perms === "1" || Platform.OS === "web"); // the browser asks for itself when a photo is added
     });
   }, []);
 
@@ -107,6 +108,7 @@ function Routes() {
         <PinchHost />
         <Toaster />
         <DialogHost />
+        <InstallSheet />
       </View>
     </IntroContext.Provider>
   );

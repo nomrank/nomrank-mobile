@@ -1,0 +1,12 @@
+{
+  "name": "Nomrank",
+  "short_name": "Nomrank",
+  "description": "Rate the dish, not the place.",
+  "start_url": "/app",
+  "scope": "/app",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#17111c",
+  "theme_color": "#17111c",
+  "icons": [{ "src": "/app/app-icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }]
+}

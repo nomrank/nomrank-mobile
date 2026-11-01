@@ -73,6 +73,11 @@ export async function sendReset(rawEmail: string): Promise<AuthResult> {
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 export async function signInWithGoogle(): Promise<AuthResult> {
+  // The Home Screen app on iPhones can't catch a popup, so the page itself goes to Google and comes back to /app.
+  if (Platform.OS === "web") {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${AUTH_SITE}/app`, queryParams: { prompt: "select_account" } } });
+    return error ? { error: "Google sign-in isn't available right now." } : {};
+  }
   if (GOOGLE_WEB_CLIENT_ID && Platform.OS === "android") {
     try {
       GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
@@ -390,8 +395,16 @@ export async function exportData(userId: string) {
   ]);
   if (results.some((r) => r.error)) return "Couldn't gather your data just now. Try again in a moment.";
   const [profile, details, ratings, comments, votes, commentVotes, saves, favourites, following, reports, notifications] = results.map((r) => r.data);
+  const json = JSON.stringify({ exported_at: new Date().toISOString(), profile, private_details: details, ratings, comments, votes, comment_votes: commentVotes, want_to_try: saves, favourites, following, reports, notifications }, null, 2);
+  if (Platform.OS === "web") {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    link.download = "nomrank-my-data.json";
+    link.click();
+    return null;
+  }
   const file = new File(Paths.cache, "nomrank-my-data.json");
-  file.write(JSON.stringify({ exported_at: new Date().toISOString(), profile, private_details: details, ratings, comments, votes, comment_votes: commentVotes, want_to_try: saves, favourites, following, reports, notifications }, null, 2));
+  file.write(json);
   await Sharing.shareAsync(file.uri, { mimeType: "application/json", dialogTitle: "Your Nomrank data" });
   return null;
 }

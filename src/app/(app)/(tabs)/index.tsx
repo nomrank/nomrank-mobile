@@ -146,7 +146,7 @@ export default function Home() {
     async (offset: number) => {
       const authors = sort === "following" && userId ? await getFollowees(supabase, userId) : [];
       const rows = await getFeed(supabase, sort, authors, { offset, show });
-      const mine = profile ? await getMyVotes(supabase, rows.map((r) => r.id)) : {};
+      const mine = profile ? await getMyVotes(supabase, rows.map((r) => r.id)).catch(() => ({})) : {}; // the feed still shows if votes fail
       return { rows, mine };
     },
     [sort, userId, show, profile],

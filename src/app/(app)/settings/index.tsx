@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Linking as ExpoLinking, Pressable, ScrollView, Switch, View } from "react-native";
+import { Linking as ExpoLinking, Platform, Pressable, ScrollView, Switch, View } from "react-native";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
@@ -11,7 +11,7 @@ import { confirm } from "@/components/dialog";
 import { OptionList } from "@/components/forms";
 import { useGo } from "@/components/social";
 import { toast } from "@/components/toast";
-import { Btn, Card, Header, Loading, Overline, T, useData } from "@/components/ui";
+import { Btn, Card, Failed, Header, Loading, Overline, T, useData } from "@/components/ui";
 import { exportData, savePreferences, savePrivacy, signOutEverywhere } from "@/lib/actions";
 import { haptic, hapticsOn, setHaptics } from "@/lib/haptics";
 import { useSession } from "@/lib/session";
@@ -181,14 +181,14 @@ export default function Settings() {
   const { userId, profile, session } = useSession();
   const go = useGo();
   const [exporting, setExporting] = useState(false);
-  const { data: privacy } = useData(async () => {
+  const { data: privacy, failed, reload } = useData(async () => {
     const { data, error } = await supabase.from("profiles").select("saves_visibility, diary_visibility, followers_visibility, following_visibility").eq("id", userId!).single<Record<PrivacyKey, Visibility>>();
     if (error) throw error;
     return data;
   }, [userId]);
 
   if (!profile || !userId) return null;
-  if (!privacy) return <><Header title="Settings" /><Loading /></>;
+  if (!privacy) return <><Header title="Settings" />{failed ? <Failed onRetry={reload} /> : <Loading />}</>;
   async function signOut() {
     if (await confirm({ title: "Sign out?", body: "You can sign back in any time.", yes: "Sign out", no: "Stay" })) await signOutEverywhere();
   }
@@ -214,7 +214,7 @@ export default function Settings() {
             <ThemeSwitch />
           </View>
         </Card>
-        <NotificationsRow />
+        {Platform.OS !== "web" && <NotificationsRow />}
         <HapticsRow />
         <Card style={{ gap: 10 }}>
           <Overline>Preferences</Overline>

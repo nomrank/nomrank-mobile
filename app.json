@@ -111,6 +111,10 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
     }
   }
 }
