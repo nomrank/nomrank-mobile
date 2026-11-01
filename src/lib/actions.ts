@@ -90,6 +90,12 @@ export async function signInWithGoogle(): Promise<AuthResult> {
   return signInWithGoogleInBrowser();
 }
 
+// Signing out of Supabase alone leaves Google remembering the account, so the next "Sign in with Google" skips the chooser.
+export async function signOutEverywhere() {
+  if (Platform.OS === "android") await GoogleSignin.signOut().catch(() => {});
+  await supabase.auth.signOut();
+}
+
 async function signInWithGoogleInBrowser(): Promise<AuthResult> {
   const redirectTo = Linking.createURL("auth");
   const { data, error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo, skipBrowserRedirect: true } });

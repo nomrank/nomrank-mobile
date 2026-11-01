@@ -3,7 +3,7 @@ import { Modal, Pressable, Text, TextInput, View, type PressableProps, type Styl
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { FadeIn, SlideInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { FoxLoader } from "./loader";
 import { brand, useTheme } from "@/theme";
 
@@ -229,7 +229,7 @@ export function Empty({ title, children }: { title?: string; children?: ReactNod
 export function Row({ onPress, label, title, meta, leading }: { onPress: () => void; label?: string; title: ReactNode; meta?: ReactNode; leading?: ReactNode }) {
   const { colors } = useTheme();
   return (
-    <Press onPress={onPress} accessibilityRole="button" to={0.985} style={{ minHeight: 64, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline }}>
+    <Pressable onPress={onPress} accessibilityRole="button" android_ripple={{ color: colors.raised }} style={{ minHeight: 64, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline }}>
       {leading}
       <View style={{ flex: 1, minWidth: 0 }}>
         {label && (
@@ -241,7 +241,7 @@ export function Row({ onPress, label, title, meta, leading }: { onPress: () => v
         {meta && (typeof meta === "string" ? <T size={14} color={colors.muted}>{meta}</T> : meta)}
       </View>
       <ChevronRightIcon size={20} color={colors.foreground} />
-    </Press>
+    </Pressable>
   );
 }
 
@@ -250,9 +250,14 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
   const { colors } = useTheme();
   const { bottom } = useSafeAreaInsets();
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1, backgroundColor: "rgba(23,17,28,0.7)" }} />
-      <View style={{ maxHeight: "85%", borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.paper, padding: 20, paddingBottom: bottom + 20 }}>{children}</View>
+    <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+      <Animated.View entering={FadeIn.duration(160)} style={{ flex: 1, backgroundColor: "rgba(23,17,28,0.7)" }}>
+        <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
+      </Animated.View>
+      <Animated.View entering={SlideInDown.duration(220)} style={{ position: "absolute", left: 0, right: 0, bottom: 0, maxHeight: "85%", borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.paper, padding: 20, paddingTop: 12, paddingBottom: bottom + 20 }}>
+        <View style={{ alignSelf: "center", width: 36, height: 4, borderRadius: 2, backgroundColor: colors.hairline, marginBottom: 14 }} />
+        {children}
+      </Animated.View>
     </Modal>
   );
 }

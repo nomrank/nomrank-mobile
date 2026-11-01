@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, KeyboardAvoidingView, Linking, Pressable, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, Linking, Pressable, ScrollView, View } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { ArrowDownIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, HouseIcon, ImagePlusIcon, PlusIcon, SearchIcon, SparklesIcon, TrophyIcon, XIcon } from "lucide-react-native";
+import { ArrowDownIcon, ArrowRightIcon, ArrowUpIcon, CameraIcon, CheckIcon, HouseIcon, ImagePlusIcon, ImagesIcon, PlusIcon, SearchIcon, SparklesIcon, TrophyIcon, XIcon } from "lucide-react-native";
 import { filterMenus } from "@/core/diet";
 import { dishKey } from "@/core/dishes";
 import { avgMove, rankMove, type Move } from "@/core/rankings";
@@ -13,8 +13,9 @@ import { formatScore, photoUrl } from "@/core/ratings";
 import { getDishById, getRestaurants, type DishDetail } from "@/core/restaurants";
 import { DietMark, DishAvg, Score } from "@/components/marks";
 import { ScoreMeter } from "@/components/score-meter";
+import { confirm } from "@/components/dialog";
 import { toast } from "@/components/toast";
-import { Btn, Card, Empty, Failed, Header, Input, Loading, Overline, Row, T, useData } from "@/components/ui";
+import { Btn, Card, Empty, Failed, Header, Input, Loading, Overline, Press, Row, Sheet, T, useData } from "@/components/ui";
 import { pickFromLibrary, saveRating, takePhoto, type PhotoDraft, type Posted } from "@/lib/actions";
 import { groupDishes } from "@/lib/home";
 import { useSession } from "@/lib/session";
@@ -225,6 +226,7 @@ function RateForm({ dish, existing }: { dish: DishDetail; existing: { score: num
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [posted, setPosted] = useState<Posted | null>(null);
+  const [picking, setPicking] = useState(false);
 
   function add(assets: ImagePicker.ImagePickerAsset[]) {
     if (!assets.length) return;
@@ -232,19 +234,24 @@ function RateForm({ dish, existing }: { dish: DishDetail; existing: { score: num
     setChanged(true);
   }
   async function fromLibrary() {
+    setPicking(false);
+    const { granted, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!granted) return blocked("Photos", canAskAgain);
     const r = await pickFromLibrary(4 - photos.length);
     if (!r.canceled) add(r.assets);
   }
   async function fromCamera() {
+    setPicking(false);
     const { granted, canAskAgain } = await ImagePicker.requestCameraPermissionsAsync();
-    if (!granted) {
-      if (!canAskAgain) Alert.alert("Camera is off for Nomrank", "Turn it on in your phone's settings to take photos here.", [{ text: "Not now" }, { text: "Open settings", onPress: () => Linking.openSettings() }]);
-      return;
-    }
+    if (!granted) return blocked("Camera", canAskAgain);
     const r = await takePhoto();
     if (!r.canceled) add(r.assets);
   }
-  const addPhoto = () => Alert.alert("Add a photo", undefined, [{ text: "Cancel", style: "cancel" }, { text: "Take a photo", onPress: fromCamera }, { text: "Choose from gallery", onPress: fromLibrary }]);
+  async function blocked(what: string, canAskAgain: boolean) {
+    if (canAskAgain) return;
+    if (await confirm({ title: `${what} is off for Nomrank`, body: "Turn it on in your phone's settings to add photos here.", yes: "Open settings", no: "Not now" })) Linking.openSettings();
+  }
+  const addPhoto = () => setPicking(true);
 
   async function submit() {
     if (!score) return setError("Pick a score from 0.5 to 10.");
@@ -324,6 +331,29 @@ function RateForm({ dish, existing }: { dish: DishDetail; existing: { score: num
           </T>
         )}
         <Btn label={busy ? "Posting" : take.trim() ? "Post it" : "Save score"} busy={busy} onPress={submit} />
+        <Sheet open={picking} onClose={() => setPicking(false)}>
+          <T size={18} weight={700}>
+            Add a photo
+          </T>
+          {(
+            [
+              [CameraIcon, "Take a photo", "Snap what you're eating", fromCamera],
+              [ImagesIcon, "Choose from gallery", `Up to ${4 - photos.length} more`, fromLibrary],
+            ] as const
+          ).map(([Icon, label, hint, run]) => (
+            <Press key={label} onPress={run} accessibilityRole="button" accessibilityLabel={label} to={0.985} style={{ minHeight: 64, flexDirection: "row", alignItems: "center", gap: 14, marginTop: 8 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.raised, alignItems: "center", justifyContent: "center" }}>
+                <Icon size={20} color={colors.foreground} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <T weight={600}>{label}</T>
+                <T size={13} color={colors.muted}>
+                  {hint}
+                </T>
+              </View>
+            </Press>
+          ))}
+        </Sheet>
         <T size={13} color={colors.faint} style={{ textAlign: "center" }}>
           Your score, take and photos are public. Rate what you actually ate, and keep it about the food.
         </T>

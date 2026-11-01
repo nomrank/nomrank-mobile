@@ -1,11 +1,11 @@
-import { memo, useState, type ReactNode } from "react";
+import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { FlatList, Pressable, ScrollView, Share, useWindowDimensions, View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { Image } from "expo-image";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { BookmarkIcon, CheckIcon, FlagIcon, MapPinIcon, MessageCircleIcon, Share2Icon, UserPlusIcon, LinkIcon, type LucideIcon } from "lucide-react-native";
-import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from "react-native-reanimated";
 import { CITIES, type City } from "@/core/cities";
 import { dishHref } from "@/core/dishes";
 import { formatScore, photoUrl, type Review, type Vote } from "@/core/ratings";
@@ -18,6 +18,7 @@ import { SHARE_SITE } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
 import { AgreeIcon, Avatar, DietMark, DisagreeIcon, DishAvg, Score, Verdict } from "./marks";
 import { toast } from "./toast";
+import { PhotoViewer } from "./photo-viewer";
 import { Btn, Input, Press, Sheet, T } from "./ui";
 
 export const useGo = () => {
@@ -32,13 +33,10 @@ const SIDES = [
 
 // Agree | Disagree as one joined control, and a quiet line for the winning side. On your own take it only shows the
 // counts. The tap answers at once with a small pop and a rolling count; the server catches up.
-export function VoteButtons({ ratingId, facts, cap, mine, mode }: { ratingId: string; facts: number; cap: number; mine?: Vote; mode: "vote" | "own" }) {
-  const { colors } = useTheme();
+export function useVote(ratingId: string, facts: number, cap: number, mine: Vote | undefined, mode: "vote" | "own") {
   const [state, setState] = useState<VoteState>({ facts, cap, mine });
   const pop = useSharedValue(1);
-  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
-  const lead = leadingSide(state.facts, state.cap);
-
+  useEffect(() => setState((s) => (s.mine === mine ? s : { ...s, mine })), [mine]); // your votes arrive after the feed does
   function press(kind: Vote) {
     if (mode === "own") return;
     const next = applyVote(state, kind);
@@ -49,6 +47,13 @@ export function VoteButtons({ ratingId, facts, cap, mine, mode }: { ratingId: st
     }
     castVote(ratingId, next.mine ?? null);
   }
+  return { state, press, pop, mode };
+}
+
+export function VoteButtons({ vote: { state, press, pop, mode } }: { vote: ReturnType<typeof useVote> }) {
+  const { colors } = useTheme();
+  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  const lead = leadingSide(state.facts, state.cap);
 
   return (
     <View style={{ gap: 6, alignItems: "flex-start" }}>
@@ -107,10 +112,12 @@ export function PersonLink({ handle, avatar, photo, size = 24 }: { handle: strin
 }
 
 // Swipe through a take's photos, with dots when there are several.
-export function PhotoCarousel({ photos, dish, onPress, width }: { photos: { path: string }[]; dish: string; onPress?: () => void; width: number }) {
+export function PhotoCarousel({ photos, dish, onAgree, width }: { photos: { path: string }[]; dish: string; onAgree?: () => void; width: number }) {
   const { colors } = useTheme();
   const [at, setAt] = useState(0);
+  const [viewing, setViewing] = useState<number | null>(null);
   const height = (width * 3) / 4;
+  const tap = useTap(onAgree);
   return (
     <View style={{ width, height, borderRadius: 12, overflow: "hidden", backgroundColor: colors.raised }}>
       <FlatList
@@ -121,7 +128,7 @@ export function PhotoCarousel({ photos, dish, onPress, width }: { photos: { path
         keyExtractor={(p) => p.path}
         onMomentumScrollEnd={(e) => setAt(Math.round(e.nativeEvent.contentOffset.x / width))}
         renderItem={({ item, index }) => (
-          <Pressable onPress={onPress} disabled={!onPress} accessibilityLabel={`Photo ${index + 1} of ${dish}`}>
+          <Pressable onPress={() => tap(() => setViewing(index))} accessibilityRole="imagebutton" accessibilityLabel={`Photo ${index + 1} of ${dish}. Opens full screen`}>
             <Image source={photoUrl(item.path)} style={{ width, height }} contentFit="cover" transition={150} recyclingKey={item.path} />
           </Pressable>
         )}
@@ -133,7 +140,40 @@ export function PhotoCarousel({ photos, dish, onPress, width }: { photos: { path
           ))}
         </View>
       )}
+      <PhotoViewer paths={photos.map((p) => p.path)} start={viewing} onClose={() => setViewing(null)} />
     </View>
+  );
+}
+
+// A tap that waits a beat to see whether a second one follows. Two taps run `double`; one runs what you hand it. With no `double`
+// (your own take) the single tap runs at once.
+function useTap(double?: () => void) {
+  const last = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  return (single?: () => void) => {
+    if (!double) return single?.();
+    const now = Date.now();
+    clearTimeout(timer.current);
+    if (now - last.current < 300) {
+      last.current = 0;
+      return double();
+    }
+    last.current = now;
+    timer.current = setTimeout(() => single?.(), 300);
+  };
+}
+
+// The big Agree that pops over a take when you double-tap it.
+function Burst({ k }: { k: number }) {
+  const s = useSharedValue(0);
+  useEffect(() => {
+    if (k) s.value = withSequence(withTiming(1, { duration: 160 }), withDelay(320, withTiming(0, { duration: 200 })));
+  }, [k, s]);
+  const style = useAnimatedStyle(() => ({ opacity: s.value, transform: [{ scale: 0.6 + 0.4 * s.value }] }));
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: "absolute", top: "32%", left: 0, right: 0, alignItems: "center" }, style]}>
+      <AgreeIcon size={72} color={brand.mustard} />
+    </Animated.View>
   );
 }
 
@@ -157,8 +197,20 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
     </View>
   );
   const open = full ? undefined : () => go(`/review/${r.id}`);
+  const voting = useVote(r.id, r.facts_count, r.cap_count, vote, mode);
+  const [burst, setBurst] = useState(0);
+  const agree =
+    mode === "own"
+      ? undefined
+      : () => {
+          if (voting.state.mine !== "facts") voting.press("facts");
+          else Haptics.selectionAsync();
+          setBurst((n) => n + 1);
+        };
+  const tap = useTap(agree);
   return (
     <Pressable onPress={open} disabled={full} style={{ paddingVertical: 16, gap: 10 }}>
+      <Burst k={burst} />
       {!showDish && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           {byline}
@@ -196,17 +248,19 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
             </View>
           )}
           {!!r.take && (
-            <T size={15} numberOfLines={full ? undefined : 6} style={{ lineHeight: 23 }}>
-              {r.take}
-            </T>
+            <Pressable onPress={() => tap(open)} accessible={false}>
+              <T size={15} numberOfLines={full ? undefined : 6} style={{ lineHeight: 23 }}>
+                {r.take}
+              </T>
+            </Pressable>
           )}
-          {r.photos.length > 0 && <PhotoCarousel photos={r.photos} dish={r.dish.name} onPress={open} width={full ? width - 40 : Math.min(width - 130, 288)} />}
+          {r.photos.length > 0 && <PhotoCarousel photos={r.photos} dish={r.dish.name} onAgree={agree} width={full ? width - 40 : Math.min(width - 130, 288)} />}
           {showDish && !inMeal && byline}
         </View>
         {showDish && <Score score={r.score} size={full ? 76 : inMeal ? 54 : 64} />}
       </View>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-        <VoteButtons key={`${r.id}-${vote ?? ""}`} ratingId={r.id} facts={r.facts_count} cap={r.cap_count} mine={vote} mode={mode} />
+        <VoteButtons vote={voting} />
         {!full && (
           <Pressable onPress={() => go(`/review/${r.id}`)} accessibilityRole="button" accessibilityLabel={`${r.comments_count} ${r.comments_count === 1 ? "comment" : "comments"}`} style={{ height: 38, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 8 }}>
             <MessageCircleIcon size={18} color={colors.muted} />
@@ -301,7 +355,7 @@ export function FollowButton({ followeeId, handle, following: initial, onChange 
 
 // The share sheet, the way X does it: a preview of what's being shared, then Copy link and Share via. The link carries the
 // website's preview card (the dish photo, the score), so it looks right wherever it lands.
-export function ShareSheet({ open, onClose, url, message, preview }: { open: boolean; onClose: () => void; url: string; message: string; preview: ReactNode }) {
+export function ShareSheet({ open, onClose, url, preview }: { open: boolean; onClose: () => void; url: string; preview: ReactNode }) {
   const { colors } = useTheme();
   async function copy() {
     await Clipboard.setStringAsync(url);
@@ -311,8 +365,8 @@ export function ShareSheet({ open, onClose, url, message, preview }: { open: boo
   }
   async function via() {
     onClose();
-    // Android takes one string, so the link goes in the message.
-    await Share.share({ message: `${message}\n${url}` }).catch(() => {});
+    // The link alone: Instagram, WhatsApp and the rest turn a bare link into the website's preview card, and fall back to plain text when words sit beside it.
+    await Share.share({ message: url }).catch(() => {});
   }
   const action = (Icon: LucideIcon, label: string, run: () => void) => (
     <Press onPress={run} accessibilityRole="button" accessibilityLabel={label} to={0.985} style={{ minHeight: 56, flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 4 }}>
@@ -347,7 +401,6 @@ export function ShareButton({ path, title, preview, size = 20, compact }: { path
         open={open}
         onClose={() => setOpen(false)}
         url={`${SHARE_SITE}${path}`}
-        message={title}
         preview={
           preview ?? (
             <T weight={600} style={{ lineHeight: 21 }}>

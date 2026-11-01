@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Alert, KeyboardAvoidingView, Pressable, ScrollView, View } from "react-native";
+import { confirm } from "@/components/dialog";
+import { KeyboardAvoidingView, Pressable, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowBigDownIcon, ArrowBigUpIcon, PencilIcon, Trash2Icon } from "lucide-react-native";
 import { getMyCommentVotes, getThreads, type Comment, type CommentVote, type Thread } from "@/core/comments";
@@ -18,9 +19,9 @@ import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/theme";
 
-function Composer({ ratingId, parentId, placeholder, onPosted, onCancel }: { ratingId: string; parentId?: string; placeholder: string; onPosted: () => void; onCancel?: () => void }) {
+function Composer({ ratingId, parentId, placeholder, start = "", onPosted, onCancel }: { ratingId: string; parentId?: string; placeholder: string; start?: string; onPosted: () => void; onCancel?: () => void }) {
   const { colors } = useTheme();
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(start);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,19 +86,12 @@ function CommentItem({ comment: c, mine, onReply, onChange }: { comment: Comment
   const { profile } = useSession();
   const viewer = profile?.username ?? null;
   const own = viewer === c.author.username;
-  const remove = () =>
-    Alert.alert("Delete this comment?", "This can't be undone.", [
-      { text: "Keep", style: "cancel" },
-      {
-        text: "Delete it",
-        style: "destructive",
-        onPress: async () => {
-          await deleteComment(c.id);
-          toast("Comment deleted");
-          onChange();
-        },
-      },
-    ]);
+  async function remove() {
+    if (!(await confirm({ title: "Delete this comment?", body: "This can't be undone.", yes: "Delete it", no: "Keep", danger: true }))) return;
+    await deleteComment(c.id);
+    toast("Comment deleted");
+    onChange();
+  }
   return (
     <View style={{ gap: 4 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -131,7 +125,8 @@ function CommentItem({ comment: c, mine, onReply, onChange }: { comment: Comment
 
 function Comments({ ratingId, threads, votes, onChange }: { ratingId: string; threads: Thread[]; votes: Record<string, CommentVote>; onChange: () => void }) {
   const { colors } = useTheme();
-  const [replyTo, setReplyTo] = useState<string | null>(null);
+  // Replies stay one level deep: answering a reply posts under the same thread and tags who you meant.
+  const [replyTo, setReplyTo] = useState<{ root: string; to: string } | null>(null);
   const total = threads.reduce((n, t) => n + 1 + t.replies.length, 0);
   return (
     <View style={{ borderTopWidth: 1, borderTopColor: colors.hairline, paddingTop: 16, gap: 12 }}>
@@ -140,17 +135,19 @@ function Comments({ ratingId, threads, votes, onChange }: { ratingId: string; th
       {threads.length ? (
         threads.map((t) => (
           <View key={t.id} style={{ paddingVertical: 6 }}>
-            <CommentItem comment={t} mine={votes[t.id]} onChange={onChange} onReply={() => setReplyTo(replyTo === t.id ? null : t.id)} />
-            {(t.replies.length > 0 || replyTo === t.id) && (
+            <CommentItem comment={t} mine={votes[t.id]} onChange={onChange} onReply={() => setReplyTo(replyTo?.root === t.id && replyTo.to === t.author.username ? null : { root: t.id, to: t.author.username })} />
+            {(t.replies.length > 0 || replyTo?.root === t.id) && (
               <View style={{ marginTop: 8, marginLeft: 14, paddingLeft: 14, borderLeftWidth: 1, borderLeftColor: colors.hairline, gap: 10 }}>
                 {t.replies.map((r) => (
-                  <CommentItem key={r.id} comment={r} mine={votes[r.id]} onChange={onChange} />
+                  <CommentItem key={r.id} comment={r} mine={votes[r.id]} onChange={onChange} onReply={() => setReplyTo({ root: t.id, to: r.author.username })} />
                 ))}
-                {replyTo === t.id && (
+                {replyTo?.root === t.id && (
                   <Composer
+                    key={replyTo.to}
                     ratingId={ratingId}
                     parentId={t.id}
-                    placeholder={`Reply to @${t.author.username}`}
+                    start={replyTo.to === t.author.username ? "" : `@${replyTo.to} `}
+                    placeholder={`Reply to @${replyTo.to}`}
                     onCancel={() => setReplyTo(null)}
                     onPosted={() => {
                       setReplyTo(null);
@@ -191,23 +188,16 @@ export default function ReviewScreen() {
     return { review, votes, threads, own, commentVotes, next, saves };
   }, [id, userId, profile?.username]);
 
-  const remove = () =>
-    Alert.alert("Delete this take?", "Your score, words and photos go, along with its votes and comments. This can't be undone.", [
-      { text: "Keep it", style: "cancel" },
-      {
-        text: "Delete take",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteRating(userId!, id);
-            toast("Take deleted");
-            router.back();
-          } catch {
-            toast("Couldn't delete that take.");
-          }
-        },
-      },
-    ]);
+  async function remove() {
+    if (!(await confirm({ title: "Delete this take?", body: "Your score, words and photos go, along with its votes and comments. This can't be undone.", yes: "Delete take", no: "Keep it", danger: true }))) return;
+    try {
+      await deleteRating(userId!, id);
+      toast("Take deleted");
+      router.back();
+    } catch {
+      toast("Couldn't delete that take.");
+    }
+  }
 
   const review = data?.review;
   return (

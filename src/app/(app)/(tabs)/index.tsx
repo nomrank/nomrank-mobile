@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FlatList, Pressable, RefreshControl, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, type Href } from "expo-router";
@@ -17,6 +17,7 @@ import { FirstTour, StartSpace } from "@/components/home-parts";
 import { FoxLoader } from "@/components/loader";
 import { dishCount, Empty, Failed, Input, Loading, Overline, Row, SortRow, T, TabRow, useData, WORDMARK } from "@/components/ui";
 import { FIRST_LIST_KEY, groupBy, groupDishes, type DishGroup } from "@/lib/home";
+import { useKeepTabsInView, useScrollToTopOnTab } from "@/lib/scroll";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
@@ -103,7 +104,12 @@ export default function Home() {
   const { userId, profile, city, prefs } = useSession();
   const router = useRouter();
   const go = useGo();
-  const [view, setView] = useState<View_>("takes");
+  // The tab row answers at once; the list under it catches up a beat later, so switching never stalls the underline.
+  const [tab, setTab] = useState<View_>("takes");
+  const view = useDeferredValue(tab);
+  const list = useRef<FlatList<Item>>(null);
+  useScrollToTopOnTab("index", list);
+  const keep = useKeepTabsInView(list);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<FeedSort>(prefs.feed_default);
   const q = dishKey(query);
@@ -246,6 +252,11 @@ export default function Home() {
     <View style={{ flex: 1, paddingTop: top }}>
       {profile && !profile.tour_done_at && <FirstTour />}
       <FlatList
+        ref={list}
+        onScroll={keep.onScroll}
+        scrollEventThrottle={32}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
         data={items}
         keyExtractor={(i) => i.key}
         renderItem={renderItem}
@@ -254,11 +265,11 @@ export default function Home() {
         onEndReached={loadMore}
         onEndReachedThreshold={1.5}
         removeClippedSubviews
-        windowSize={9}
+        windowSize={7}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={brand.mustard} colors={[brand.ketchup]} />}
         ListFooterComponent={more ? <View style={{ alignItems: "center", padding: 16 }}><FoxLoader size={40} /></View> : done && view === "takes" && !q && (reviews?.length ?? 0) > FEED_PAGE ? <T size={14} color={colors.faint} style={{ textAlign: "center", padding: 16 }}>You&apos;re all caught up.</T> : undefined}
         ListHeaderComponent={
-          <View style={{ gap: 12 }}>
+          <View onLayout={keep.onHeaderLayout} style={{ gap: 12 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 8 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <LogoMark size={28} />
@@ -289,7 +300,14 @@ export default function Home() {
                 </Pressable>
               )}
             </View>
-            {!q && <TabRow tabs={TABS} value={view} onChange={setView} />}
+            {!q && <TabRow
+                tabs={TABS}
+                value={tab}
+                onChange={(t) => {
+                  keep.settle();
+                  setTab(t);
+                }}
+              />}
             {!q && view === "takes" && <SortRow options={["new", "top", "following"] as const} value={sort} onChange={setSort} />}
           </View>
         }

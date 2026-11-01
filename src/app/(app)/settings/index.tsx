@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Linking as ExpoLinking, Pressable, ScrollView, View } from "react-native";
+import { Linking as ExpoLinking, Pressable, ScrollView, View } from "react-native";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
@@ -7,11 +7,12 @@ import { DownloadIcon, ExternalLinkIcon, LogOutIcon, MonitorIcon, MoonIcon, Penc
 import { SHOW_DIETS, type ShowDiet } from "@/core/diet";
 import { VISIBILITIES, type FeedDefault, type Visibility } from "@/core/profiles";
 import { DeleteAccount } from "@/components/delete-account";
+import { confirm } from "@/components/dialog";
 import { OptionList } from "@/components/forms";
 import { useGo } from "@/components/social";
 import { toast } from "@/components/toast";
 import { Btn, Card, Header, Loading, Overline, T, useData } from "@/components/ui";
-import { exportData, savePreferences, savePrivacy } from "@/lib/actions";
+import { exportData, savePreferences, savePrivacy, signOutEverywhere } from "@/lib/actions";
 import { useSession } from "@/lib/session";
 import { SITE, supabase } from "@/lib/supabase";
 import { brand, useTheme, type Choice } from "@/theme";
@@ -160,7 +161,9 @@ export default function Settings() {
   }, [userId]);
 
   if (!profile || !userId) return null;
-  const signOut = () => Alert.alert("Sign out?", undefined, [{ text: "Stay", style: "cancel" }, { text: "Sign out", onPress: () => supabase.auth.signOut() }]);
+  async function signOut() {
+    if (await confirm({ title: "Sign out?", body: "You can sign back in any time.", yes: "Sign out", no: "Stay" })) await signOutEverywhere();
+  }
   async function download() {
     setExporting(true);
     const failed = await exportData(userId!);
@@ -203,7 +206,6 @@ export default function Settings() {
           </T>
           <Btn label="Edit profile" icon={PencilIcon} variant="secondary" onPress={() => go("/settings/profile")} />
           <Btn label="Download my data" icon={DownloadIcon} variant="secondary" busy={exporting} onPress={download} />
-          <Btn label="Sign out" icon={LogOutIcon} variant="secondary" onPress={signOut} />
         </Card>
         <Card style={{ gap: 2 }}>
           <Overline>About</Overline>
@@ -213,10 +215,8 @@ export default function Settings() {
           <Link label="Privacy" path="/privacy" />
           <Link label="Credits" path="/credits" />
         </Card>
-        <Card style={{ gap: 8, borderColor: colors.destructive }}>
-          <Overline>Danger zone</Overline>
-          <DeleteAccount userId={userId} username={profile.username} />
-        </Card>
+        <Btn label="Sign out" icon={LogOutIcon} variant="secondary" onPress={signOut} />
+        <DeleteAccount userId={userId} username={profile.username} />
         <T size={12} color={colors.faint} style={{ textAlign: "center" }}>
           Nomrank {Constants.expoConfig?.version}
         </T>

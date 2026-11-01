@@ -11,6 +11,7 @@ import { toast } from "@/components/toast";
 import { CityPicker } from "@/components/social";
 import { Btn, Failed, Loading, Press, T, useData } from "@/components/ui";
 import { voteBattle } from "@/lib/actions";
+import { useScrollToTopOnTab } from "@/lib/scroll";
 import { useSession } from "@/lib/session";
 import { SITE, supabase } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
@@ -142,6 +143,7 @@ export default function Battles() {
   const [streak, setStreak] = useState(0);
   const [height, setHeight] = useState(0);
   const list = useRef<FlatList<Battle | "end">>(null);
+  useScrollToTopOnTab("battles", list);
   const onScreen = useRef<string | null>(null);
   const advance = useRef<ReturnType<typeof setTimeout> | null>(null);
 

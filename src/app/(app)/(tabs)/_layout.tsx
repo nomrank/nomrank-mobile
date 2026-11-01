@@ -5,6 +5,7 @@ import { BellIcon, HomeIcon, PlusIcon, SwordsIcon } from "lucide-react-native";
 import { Avatar } from "@/components/marks";
 import { T } from "@/components/ui";
 import { useActivity } from "@/lib/activity";
+import { tabPressed } from "@/lib/scroll";
 import { useSession } from "@/lib/session";
 import { brand, useTheme } from "@/theme";
 
@@ -21,7 +22,10 @@ function TabBar({ state }: { state: { index: number; routes: { key: string; name
   const tab = (name: string, active: boolean, icon: React.ReactNode, label: string, a11y = label) => (
     <Pressable
       key={name}
-      onPress={() => router.navigate((name === "index" ? "/" : `/${name}`) as Href)}
+      onPress={() => {
+        router.navigate((name === "index" ? "/" : `/${name}`) as Href);
+        tabPressed(name);
+      }}
       accessibilityRole="tab"
       accessibilityLabel={a11y}
       accessibilityState={{ selected: active }}

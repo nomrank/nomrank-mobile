@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { deleteAccount } from "@/lib/actions";
 import { useTheme } from "@/theme";
 import { Btn, Input, T } from "./ui";
@@ -17,9 +17,16 @@ export function DeleteAccount({ userId, username }: { userId: string; username: 
     setBusy(false);
     setError(failed);
   }
-  if (!open) return <Btn label="Delete my account" variant="ghost" onPress={() => setOpen(true)} />;
+  if (!open)
+    return (
+      <Pressable onPress={() => setOpen(true)} accessibilityRole="button" style={{ minHeight: 44, alignItems: "center", justifyContent: "center" }}>
+        <T size={14} color={colors.faint}>
+          Delete my account
+        </T>
+      </Pressable>
+    );
   return (
-    <View style={{ gap: 8 }}>
+    <View style={{ gap: 8, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.destructive }}>
       <T size={14} color={colors.muted}>
         This removes your account, ratings, takes, comments and photos for good. Type <T size={14} weight={600}>{username}</T> to confirm.
       </T>

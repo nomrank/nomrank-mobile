@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { FlatList, Linking, Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -14,6 +14,7 @@ import { toast } from "@/components/toast";
 import { Btn, Card, Empty, Failed, Header, Loading, Overline, Row, Sheet, T, TabRow, useData } from "@/components/ui";
 import { saveFavourites } from "@/lib/actions";
 import { groupBy } from "@/lib/home";
+import { useKeepTabsInView, useScrollToTopOnTab } from "@/lib/scroll";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
@@ -287,6 +288,9 @@ export function ProfileScreen({ handle, tab: asTab }: { handle: string; tab?: bo
   const { userId, profile: viewer } = useSession();
   const go = useGo();
   const [tab, setTab] = useState<"takes" | "diary" | "saved">("takes");
+  const list = useRef<FlatList<Item>>(null);
+  useScrollToTopOnTab(asTab ? "you" : "", list);
+  const keep = useKeepTabsInView(list);
 
   const { data, failed, reload } = useData(async () => {
     const p = await getProfileByHandle(supabase, handle);
@@ -397,13 +401,16 @@ export function ProfileScreen({ handle, tab: asTab }: { handle: string; tab?: bo
     <View style={{ flex: 1 }}>
       {head}
       <FlatList
+        ref={list}
+        onScroll={keep.onScroll}
+        scrollEventThrottle={32}
         data={items}
         keyExtractor={(i) => i.key}
         renderItem={renderItem}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={reload} tintColor={brand.mustard} colors={[brand.ketchup]} />}
         ListHeaderComponent={
-          <View style={{ gap: 14, paddingTop: 8 }}>
+          <View onLayout={keep.onHeaderLayout} style={{ gap: 14, paddingTop: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
               <Avatar handle={p.username} code={p.avatar} photo={p.avatar_path} size={80} />
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
@@ -513,7 +520,10 @@ export function ProfileScreen({ handle, tab: asTab }: { handle: string; tab?: bo
                 ["saved", savesOpen ? `Want to try ${saves.length}` : "Want to try · private"],
               ]}
               value={tab}
-              onChange={setTab}
+              onChange={(t) => {
+                keep.settle();
+                setTab(t);
+              }}
             />
           </View>
         }

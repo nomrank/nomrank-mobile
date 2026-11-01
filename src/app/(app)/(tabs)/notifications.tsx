@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { FlatList, Pressable, RefreshControl, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,6 +10,7 @@ import { useGo } from "@/components/social";
 import { Empty, Failed, Loading, T, useData } from "@/components/ui";
 import { markAllRead } from "@/lib/actions";
 import { useActivity } from "@/lib/activity";
+import { useScrollToTopOnTab } from "@/lib/scroll";
 import { useSession } from "@/lib/session";
 import { SITE, supabase } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
@@ -68,6 +69,8 @@ export default function Activity() {
   }, [data, userId, refresh]);
 
   const renderItem = useCallback(({ item }: { item: Notification }) => <Item n={item} />, []);
+  const list = useRef<FlatList<Notification>>(null);
+  useScrollToTopOnTab("notifications", list);
   return (
     <View style={{ flex: 1, paddingTop: top }}>
       <T size={22} weight={800} accessibilityRole="header" style={{ paddingHorizontal: 20, paddingVertical: 12 }}>
@@ -79,6 +82,7 @@ export default function Activity() {
         <Loading />
       ) : (
         <FlatList
+          ref={list}
           data={data}
           keyExtractor={(n) => n.id}
           renderItem={renderItem}
