@@ -1,5 +1,5 @@
 import { Pressable, View } from "react-native";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs, useRouter, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BellIcon, HomeIcon, PlusIcon, SwordsIcon } from "lucide-react-native";
 import { Avatar } from "@/components/marks";
@@ -11,7 +11,7 @@ import { brand, useTheme } from "@/theme";
 const LABELS: Record<string, string> = { index: "Home", battles: "Battles", notifications: "Activity", you: "You" };
 
 // The bottom bar: Home, Battles, the big Rate button, Activity and You.
-function TabBar({ state, navigation }: { state: { index: number; routes: { key: string; name: string }[] }; navigation: { navigate: (name: string) => void; emit: (e: { type: "tabPress"; target: string; canPreventDefault: true }) => { defaultPrevented: boolean } } }) {
+function TabBar({ state }: { state: { index: number; routes: { key: string; name: string }[] } }) {
   const { colors } = useTheme();
   const { bottom } = useSafeAreaInsets();
   const { profile } = useSession();
@@ -21,10 +21,7 @@ function TabBar({ state, navigation }: { state: { index: number; routes: { key: 
   const tab = (name: string, active: boolean, icon: React.ReactNode, label: string, a11y = label) => (
     <Pressable
       key={name}
-      onPress={() => {
-        const target = state.routes.find((r) => r.name === name)?.key ?? name;
-        if (!navigation.emit({ type: "tabPress", target, canPreventDefault: true }).defaultPrevented) navigation.navigate(name);
-      }}
+      onPress={() => router.navigate((name === "index" ? "/" : `/${name}`) as Href)}
       accessibilityRole="tab"
       accessibilityLabel={a11y}
       accessibilityState={{ selected: active }}
@@ -79,7 +76,7 @@ function TabBar({ state, navigation }: { state: { index: number; routes: { key: 
 export default function TabsLayout() {
   const { colors } = useTheme();
   return (
-    <Tabs tabBar={(props) => <TabBar {...(props as unknown as Parameters<typeof TabBar>[0])} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}>
+    <Tabs tabBar={(props) => <TabBar state={props.state} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="battles" />
       <Tabs.Screen name="notifications" />
