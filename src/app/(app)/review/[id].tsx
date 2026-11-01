@@ -10,7 +10,7 @@ import { getDishesToRate } from "@/core/restaurants";
 import { timeAgo } from "@/core/time";
 import { toggleVote } from "@/core/votes";
 import { RateAnother } from "@/components/rate-another";
-import { PersonLink, ReportButton, ReviewCard, ShareButton, useGo } from "@/components/social";
+import { PersonLink, ReportButton, ReviewCard, ShareTake, useGo } from "@/components/social";
 import { toast } from "@/components/toast";
 import { Btn, Empty, Failed, Header, Input, Loading, Overline, T, useData } from "@/components/ui";
 import { addComment, castCommentVote, deleteComment, deleteRating } from "@/lib/actions";
@@ -212,7 +212,7 @@ export default function ReviewScreen() {
   const review = data?.review;
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="height">
-      <Header right={review ? <ShareButton path={`/review/${review.id}`} title={`@${review.author.username} on ${review.dish.name}`} /> : undefined} />
+      <Header right={review ? <ShareTake review={review} /> : undefined} />
       {failed && !data ? (
         <Failed onRetry={reload} />
       ) : !data ? (

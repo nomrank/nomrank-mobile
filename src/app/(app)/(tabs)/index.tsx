@@ -15,7 +15,7 @@ import { DietMark, DishAvg } from "@/components/marks";
 import { CityPicker, MealCard, ReviewCard, useGo } from "@/components/social";
 import { FirstTour, StartSpace } from "@/components/home-parts";
 import { FoxLoader } from "@/components/loader";
-import { dishCount, Empty, Failed, Input, Loading, Overline, Rise, Row, SortRow, T, TabRow, useData, WORDMARK } from "@/components/ui";
+import { dishCount, Empty, Failed, Input, Loading, Overline, Row, SortRow, T, TabRow, useData, WORDMARK } from "@/components/ui";
 import { FIRST_LIST_KEY, groupBy, groupDishes, type DishGroup } from "@/lib/home";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -240,7 +240,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `go` is stable in effect
   }, [q, view, reviews, votes, feedFailed, sort, restaurants, leaders, browse.data, browse.failed, profile, colors]);
 
-  const renderItem = useCallback(({ item, index }: { item: Item; index: number }) => <Rise index={index}>{item.node()}</Rise>, []);
+  const renderItem = useCallback(({ item }: { item: Item }) => <>{item.node()}</>, []);
 
   return (
     <View style={{ flex: 1, paddingTop: top }}>
@@ -261,8 +261,8 @@ export default function Home() {
           <View style={{ gap: 12 }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 8 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <LogoMark size={36} />
-                <T style={{ fontFamily: WORDMARK, fontSize: 22, letterSpacing: -0.8 }}>nomrank</T>
+                <LogoMark size={28} />
+                <T style={{ fontFamily: WORDMARK, fontSize: 20, letterSpacing: -0.7 }}>nomrank</T>
               </View>
               <CityPicker />
             </View>

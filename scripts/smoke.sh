@@ -1,21 +1,32 @@
 #!/usr/bin/env bash
-# Installs the release APK on the running emulator, opens it, then jumps to each screen by link and records whether the
-# app survived. A crash is reported with the screen that caused it.
+# Installs the release APK on the running emulator, opens it as a made-up signed-in person, and taps through the bottom bar the
+# way a hand does. A crash is reported with the tab that caused it.
 mkdir -p smoke
 adb install android/app/build/outputs/apk/release/app-release.apk
 adb logcat -c
 adb shell monkey -p in.nomrank.app -c android.intent.category.LAUNCHER 1
-sleep 40
+sleep 45
 adb exec-out screencap -p > smoke/launch.png
+
+size=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1); w=${size%x*}; h=${size#*x}
+dens=$(adb shell wm density | grep -oE '[0-9]+' | tail -1)
+y=$((h - 52 * dens / 160))
 failed=0
-open() {
-  adb shell am start -W -a android.intent.action.VIEW -d "$1" in.nomrank.app > /dev/null
-  sleep 9
-  name=$(echo "$1" | tr -c 'a-zA-Z0-9\n' '_')
-  adb exec-out screencap -p > "smoke/$name.png"
-  if adb shell pidof in.nomrank.app > /dev/null; then echo "ok    $1"; else echo "DIED  $1"; failed=1; adb shell monkey -p in.nomrank.app -c android.intent.category.LAUNCHER 1 > /dev/null; sleep 12; fi
+alive() { adb shell pidof in.nomrank.app > /dev/null; }
+tap_tab() { # index 0-4: Home, Battles, Rate, Activity, You
+  adb shell input tap $(( (2 * $1 + 1) * w / 10 )) "$y"
+  sleep 7
+  adb exec-out screencap -p > "smoke/tab$1.png"
+  if alive; then echo "ok    tab $1 ($2)"; else echo "DIED  tab $1 ($2)"; failed=1; adb shell monkey -p in.nomrank.app -c android.intent.category.LAUNCHER 1 > /dev/null; sleep 15; fi
 }
-for path in battles notifications you rate "rate?dish=none" settings "u/nobody" "top/biryani"; do open "nomrank:///$path"; done
+tap_tab 1 Battles
+tap_tab 0 Home
+tap_tab 3 Activity
+tap_tab 4 You
+tap_tab 0 Home
+tap_tab 2 Rate
+adb shell input keyevent KEYCODE_BACK; sleep 3
+tap_tab 1 Battles
 adb logcat -d > smoke/logcat.txt
-grep -E "FATAL EXCEPTION|ReactNativeJS|AndroidRuntime" -A12 smoke/logcat.txt | grep -v "Access denied" | head -150 > smoke/crash.txt || true
+grep -E "FATAL EXCEPTION|ReactNativeJS|AndroidRuntime: " -A14 smoke/logcat.txt | grep -v "Access denied" | head -160 > smoke/crash.txt || true
 exit $failed

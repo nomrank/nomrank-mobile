@@ -16,5 +16,8 @@ AppState.addEventListener("change", (state) => {
 
 // Where people land from legal links and shared links.
 export const SITE = "https://www.nomrank.in";
+// Shared takes, dishes and profiles have to open for whoever gets them, and show their preview card. Until launch the main site only
+// shows the waitlist, so those links point at beta. Switch this to SITE the day the main site opens.
+export const SHARE_SITE = "https://beta.nomrank.in";
 // Email links need a site that serves /auth/confirm. The main site doesn't until launch, so they stay on beta.
 export const AUTH_SITE = "https://beta.nomrank.in";

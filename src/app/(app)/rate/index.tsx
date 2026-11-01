@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
-import Animated, { FadeInDown, ZoomIn } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { ArrowDownIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, HouseIcon, ImagePlusIcon, PlusIcon, SearchIcon, SparklesIcon, TrophyIcon, XIcon } from "lucide-react-native";
 import { filterMenus } from "@/core/diet";
 import { dishKey } from "@/core/dishes";
@@ -103,9 +103,7 @@ function PostedPanel({ posted: p }: { posted: Posted }) {
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 12 }}>
       <Animated.View entering={FadeInDown.duration(360)} style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-        <Animated.View entering={ZoomIn.delay(80).springify().damping(11)}>
-          <Score score={p.score} size={84} />
-        </Animated.View>
+        <Score score={p.score} size={84} />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <CheckIcon size={15} color={colors.mustardInk} strokeWidth={3} />
@@ -120,7 +118,7 @@ function PostedPanel({ posted: p }: { posted: Posted }) {
         </View>
       </Animated.View>
       {after && (
-        <Animated.View entering={FadeInDown.delay(120).duration(420)}>
+        <Animated.View entering={FadeInDown.duration(260)}>
           <Card style={{ gap: 6 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <SparklesIcon size={15} color={colors.mustardInk} />
@@ -149,7 +147,7 @@ function PostedPanel({ posted: p }: { posted: Posted }) {
         </Animated.View>
       )}
       {after?.list && (
-        <Animated.View entering={FadeInDown.delay(220).duration(420)}>
+        <Animated.View entering={FadeInDown.duration(260)}>
           <Card style={{ gap: 6 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <TrophyIcon size={15} color={colors.mustardInk} />
@@ -178,7 +176,7 @@ function PostedPanel({ posted: p }: { posted: Posted }) {
         </Animated.View>
       )}
       {home && (
-        <Animated.View entering={FadeInDown.delay(320).duration(420)}>
+        <Animated.View entering={FadeInDown.duration(260)}>
           <Card style={{ gap: 6 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <HouseIcon size={15} color={colors.mustardInk} />
@@ -209,7 +207,7 @@ function PostedPanel({ posted: p }: { posted: Posted }) {
           </Card>
         </Animated.View>
       )}
-      <Animated.View entering={FadeInDown.delay(420).duration(420)} style={{ gap: 8, marginTop: 4 }}>
+      <Animated.View entering={FadeInDown.duration(260)} style={{ gap: 8, marginTop: 4 }}>
         <Btn label="See it" icon={TrophyIcon} onPress={() => router.replace(p.href as Href)} />
         <Btn label="Rate another dish" icon={PlusIcon} variant="secondary" onPress={() => router.replace("/rate")} />
       </Animated.View>

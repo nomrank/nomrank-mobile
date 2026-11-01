@@ -3,7 +3,7 @@ import { FlatList, Pressable, Share, View, type LayoutChangeEvent } from "react-
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import Animated, { FadeInLeft, FadeInRight, useAnimatedStyle, useReducedMotion, withTiming, ZoomIn } from "react-native-reanimated";
+import Animated, { FadeIn, useAnimatedStyle, useReducedMotion, withTiming } from "react-native-reanimated";
 import { CheckIcon, FlameIcon, ShareIcon, SwordsIcon, TrophyIcon } from "lucide-react-native";
 import { getBattles, split, type Battle } from "@/core/battles";
 import { DietMark } from "@/components/marks";
@@ -28,7 +28,7 @@ function Side({ battle, side, percent, lead, saving, onVote }: { battle: Battle;
   const rated = d.avg !== null && d.count > 0;
   const fill = useAnimatedStyle(() => ({ transform: [{ scaleY: withTiming(voted ? percent / 100 : 0, { duration: reduce ? 0 : 700 }) }] }));
   return (
-    <Animated.View entering={(side === "a" ? FadeInLeft : FadeInRight).duration(420).delay(side === "a" ? 80 : 180)} style={{ flex: 1, minWidth: 0 }}>
+    <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1, minWidth: 0 }}>
       <Press onPress={() => onVote(battle, side)} accessibilityRole="button" accessibilityLabel={`Vote for ${d.name} at ${d.place}`} accessibilityState={{ selected: mine }} style={{ gap: 10, opacity: voted && !mine ? 0.6 : 1 }}>
       <View style={{ aspectRatio: 3 / 4, maxHeight: 340, borderRadius: 24, padding: 14, overflow: "hidden", justifyContent: "space-between", backgroundColor: side === "a" ? brand.ketchup : brand.mustard, borderWidth: mine ? 3 : 0, borderColor: colors.foreground }}>
         <Animated.View style={[{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, transformOrigin: "bottom", backgroundColor: "rgba(23,17,28,0.25)" }, fill]} />
@@ -94,7 +94,7 @@ const BattleCard = memo(function BattleCard({ battle: b, index, total, height, s
         <Side battle={b} side="a" percent={s.a} lead={voted && s.n > 1 && b.votes.a > b.votes.b} saving={saving} onVote={onVote} />
         <Side battle={b} side="b" percent={s.b} lead={voted && s.n > 1 && b.votes.b > b.votes.a} saving={saving} onVote={onVote} />
         {!voted && (
-          <Animated.View entering={ZoomIn.delay(460).springify().damping(13)} pointerEvents="none" style={{ position: "absolute", left: "50%", top: 110, marginLeft: -24, width: 48, height: 48, borderRadius: 24, borderWidth: 4, borderColor: colors.background, backgroundColor: brand.studio, alignItems: "center", justifyContent: "center" }}>
+          <Animated.View entering={FadeIn.duration(220)} pointerEvents="none" style={{ position: "absolute", left: "50%", top: 110, marginLeft: -24, width: 48, height: 48, borderRadius: 24, borderWidth: 4, borderColor: colors.background, backgroundColor: brand.studio, alignItems: "center", justifyContent: "center" }}>
             <T size={14} weight={800} color="#fff4ea">
               VS
             </T>

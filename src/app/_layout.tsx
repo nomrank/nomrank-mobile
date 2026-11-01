@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useRouter, type Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -11,7 +11,7 @@ import { PlusJakartaSans_800ExtraBold } from "@expo-google-fonts/plus-jakarta-sa
 import { DMSerifDisplay_400Regular } from "@expo-google-fonts/dm-serif-display";
 import { Loader } from "@/components/loader";
 import { Toaster } from "@/components/toast";
-import { IntroContext, INTRO_KEY, PERMISSIONS_KEY } from "@/lib/intro";
+import { IntroContext, INTRO_KEY, PERMISSIONS_KEY, takeLink } from "@/lib/intro";
 import "@/lib/notify"; // defines the background check at launch, including when Android starts the app just for it
 import { SessionProvider, useSession } from "@/lib/session";
 import { ThemeProvider, useTheme } from "@/theme";
@@ -52,6 +52,14 @@ function Routes() {
       setAsked(perms === "1");
     });
   }, []);
+
+  const router = useRouter();
+  const entered = SMOKE || (seen === true && Boolean(session) && Boolean(profile) && !profile?.banned_at && asked);
+  useEffect(() => {
+    if (!entered) return;
+    const link = takeLink();
+    if (link) router.push(link as Href);
+  }, [entered, router]);
 
   if (!ready || seen === null) return <Loader />;
 

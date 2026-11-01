@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from "@react-native-google-signin/google-signin";
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
@@ -65,8 +67,30 @@ export async function sendReset(rawEmail: string): Promise<AuthResult> {
   return { sent: "reset" };
 }
 
-// Google in the system browser, back to the app through its nomrank:// link, code swapped for a session here.
+// Google, the way other apps do it: Android's own account chooser slides up over the app, you tap an account, and Supabase
+// trusts the ID token Google hands back. No browser. Without a client ID (or on the web preview) it falls back to the browser flow.
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+
 export async function signInWithGoogle(): Promise<AuthResult> {
+  if (GOOGLE_WEB_CLIENT_ID && Platform.OS === "android") {
+    try {
+      GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      if (!isSuccessResponse(response)) return {}; // they closed the chooser
+      const token = response.data.idToken;
+      if (!token) return { error: "Google sign-in didn't finish. Try again." };
+      const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token });
+      return error ? { error: "Google sign-in didn't finish. Try again." } : {};
+    } catch (e) {
+      if (isErrorWithCode(e) && (e.code === statusCodes.SIGN_IN_CANCELLED || e.code === statusCodes.IN_PROGRESS)) return {};
+      return { error: "Google sign-in isn't available right now. Try email instead." };
+    }
+  }
+  return signInWithGoogleInBrowser();
+}
+
+async function signInWithGoogleInBrowser(): Promise<AuthResult> {
   const redirectTo = Linking.createURL("auth");
   const { data, error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo, skipBrowserRedirect: true } });
   if (error || !data.url) return { error: "Google sign-in isn't available right now." };

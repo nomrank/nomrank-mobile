@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import { Image } from "expo-image";
-import Animated, { FadeInDown } from "react-native-reanimated";
 import { useLocalSearchParams } from "expo-router";
 import { ChevronRightIcon, ClockIcon, TrophyIcon } from "lucide-react-native";
 import { dishHref, keyFromDishSlug } from "@/core/dishes";
@@ -9,7 +8,7 @@ import { countWanted, isSaved } from "@/core/profiles";
 import { getRankings, listHref } from "@/core/rankings";
 import { formatScore, getDishRatings, getMyVotes, photoUrl, scoreColor, summarize, type Review } from "@/core/ratings";
 import { getDish, getDishesToRate } from "@/core/restaurants";
-import { DietMark, TastesLikeHome } from "@/components/marks";
+import { DietMark, Score, TastesLikeHome } from "@/components/marks";
 import { RateAnother } from "@/components/rate-another";
 import { ReportButton, ReviewCard, SaveButton, ShareButton, useGo } from "@/components/social";
 import { Btn, Empty, Failed, Header, Loading, Overline, SortRow, T, useData } from "@/components/ui";
@@ -84,7 +83,21 @@ export default function DishScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Header right={<ShareButton path={dishHref(dish.restaurant.slug, dish.name)} title={`${dish.name} at ${dish.restaurant.name}`} />} />
+      <Header right={<ShareButton
+            path={dishHref(dish.restaurant.slug, dish.name)}
+            title={average === null ? `${dish.name} at ${dish.restaurant.name}` : `${dish.name} at ${dish.restaurant.name}: ${average.toFixed(1)}/10 from ${count} ${count === 1 ? "rating" : "ratings"}`}
+            preview={
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                {average !== null && <Score score={average} size={52} />}
+                <View style={{ flex: 1 }}>
+                  <T weight={700}>{dish.name}</T>
+                  <T size={14} color={colors.muted}>
+                    {dish.restaurant.name}, {dish.restaurant.area}
+                  </T>
+                </View>
+              </View>
+            }
+          />} />
       <FlatList
         data={reviews}
         keyExtractor={(r) => r.id}
@@ -133,7 +146,7 @@ export default function DishScreen() {
               </View>
               <View accessibilityLabel={`Scores: ${spread.map((n, i) => `${n} rated ${i + 1}`).join(", ")}`} style={{ flex: 1, height: 56, flexDirection: "row", alignItems: "flex-end", gap: 3 }}>
                 {spread.map((n, i) => (
-                  <Animated.View key={i} entering={FadeInDown.duration(300).delay(i * 25)} style={{ flex: 1, height: Math.max(3, (n / peak) * 56), borderTopLeftRadius: 2, borderTopRightRadius: 2, backgroundColor: colors.faint, opacity: 0.55 }} />
+                  <View key={i} style={{ flex: 1, height: Math.max(3, (n / peak) * 56), borderTopLeftRadius: 2, borderTopRightRadius: 2, backgroundColor: colors.faint, opacity: 0.55 }} />
                 ))}
               </View>
             </View>

@@ -22,6 +22,7 @@ jobs:
     env:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,9 +53,11 @@ jobs:
       - name: Version
         id: ver
         run: |
-          # versionCode must rise with every build so a newer APK installs over an older one
-          node -e 'const f="app.json",j=require("./"+f);j.expo.android.versionCode=Number(process.env.RUN);require("fs").writeFileSync(f,JSON.stringify(j,null,2))'
-          echo "name=$(node -p 'require("./app.json").expo.version')" >> "$GITHUB_OUTPUT"
+          # The app is 0.1.N and N rises by one with every release: this run number minus five, since six runs came before the
+          # numbering started, so the first one is 0.1.2. versionCode rises too, so a newer APK installs over an older one.
+          export PATCH=$((RUN - 5))
+          node -e 'const f="app.json",j=require("./"+f);j.expo.version="0.1."+process.env.PATCH;j.expo.android.versionCode=Number(process.env.RUN);require("fs").writeFileSync(f,JSON.stringify(j,null,2))'
+          echo "name=0.1.$PATCH" >> "$GITHUB_OUTPUT"
         env:
           RUN: ${{ github.run_number }}
 
@@ -71,7 +74,7 @@ jobs:
       - name: Name the file
         id: apk
         run: |
-          APK="nomrank-${{ steps.ver.outputs.name }}-build${{ github.run_number }}.apk"
+          APK="nomrank-${{ steps.ver.outputs.name }}.apk"
           cp android/app/build/outputs/apk/release/app-release.apk "$APK"
           echo "file=$APK" >> "$GITHUB_OUTPUT"
 
@@ -80,7 +83,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NOTES: ${{ github.event.head_commit.message }}
         run: |
-          gh release create "build-${{ github.run_number }}" "${{ steps.apk.outputs.file }}" \
+          # The release is the version itself with the APK attached. It stays a pre-release until you say otherwise.
+          gh release create "v${{ steps.ver.outputs.name }}" "${{ steps.apk.outputs.file }}" \
             --prerelease \
-            --title "Nomrank ${{ steps.ver.outputs.name }} (build ${{ github.run_number }})" \
+            --title "Nomrank ${{ steps.ver.outputs.name }}" \
             --notes "$NOTES"

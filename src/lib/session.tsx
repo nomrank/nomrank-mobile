@@ -17,6 +17,11 @@ export type Profile = {
   regions: { name: string; demonym: string } | null;
 };
 
+// The emulator smoke test (scripts/smoke.sh) runs as a made-up signed-in person, so the signed-in tab bar and screens are exercised.
+const SMOKE = process.env.EXPO_PUBLIC_SMOKE === "1";
+const SMOKE_ID = "00000000-0000-4000-8000-000000000000";
+const SMOKE_PROFILE: Profile = { username: "smoke", avatar: null, avatar_path: null, home_region: "karnataka", city: null, tour_done_at: "2026-01-01T00:00:00Z", banned_at: null, regions: null };
+
 const CITY_KEY = "nomrank-city";
 const ASKED_KEY = "nomrank-city-asked";
 const DEFAULT_PREFS = { show_diet: "all" as ShowDiet, feed_default: "new" as FeedDefault };
@@ -80,6 +85,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Ctx>(() => {
     const city = profile?.city ?? localCity;
+    if (SMOKE) return { ready: true, session: null, userId: SMOKE_ID, profile: SMOKE_PROFILE, city: null, askCity: false, setCity: () => {}, skipCity: () => {}, prefs, reload };
     return {
       ready: known && loaded,
       session: session ?? null,

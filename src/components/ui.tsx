@@ -3,7 +3,7 @@ import { Modal, Pressable, Text, TextInput, View, type PressableProps, type Styl
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { FoxLoader } from "./loader";
 import { brand, useTheme } from "@/theme";
 
@@ -34,12 +34,6 @@ export function Press({ style, onPressIn, onPressOut, to = 0.97, ...rest }: Omit
       style={[style, anim]}
     />
   );
-}
-
-// Rows rise in one after another when a list opens. Only the first few, so scrolling never waits.
-export function Rise({ index, children }: { index: number; children: ReactNode }) {
-  if (index > 8) return <>{children}</>;
-  return <Animated.View entering={FadeInDown.duration(300).delay(index * 35)}>{children}</Animated.View>;
 }
 
 export function T({ size = 15, weight = 400, color, style, ...rest }: TProps) {
@@ -129,8 +123,8 @@ export function TabRow<K extends string>({ tabs, value, onChange }: { tabs: read
   const move = (k: K, jump: boolean) => {
     const s = spots.current[k];
     if (!s) return;
-    x.value = jump ? s.x : withSpring(s.x, { damping: 20, stiffness: 240 });
-    width.value = jump ? s.width : withSpring(s.width, { damping: 20, stiffness: 240 });
+    x.value = jump ? s.x : withTiming(s.x, { duration: 180 });
+    width.value = jump ? s.width : withTiming(s.width, { duration: 180 });
   };
   useEffect(() => move(value, false), [value]); // eslint-disable-line react-hooks/exhaustive-deps -- shared values are stable
   return (

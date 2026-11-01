@@ -1,6 +1,4 @@
-import { useEffect } from "react";
 import { Pressable, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming, ZoomIn } from "react-native-reanimated";
 import { Tabs, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BellIcon, HomeIcon, PlusIcon, SwordsIcon } from "lucide-react-native";
@@ -9,16 +7,6 @@ import { T } from "@/components/ui";
 import { useActivity } from "@/lib/activity";
 import { useSession } from "@/lib/session";
 import { brand, useTheme } from "@/theme";
-
-// The icon gives a small hop when its tab is picked.
-function Pop({ on, children }: { on: boolean; children: React.ReactNode }) {
-  const scale = useSharedValue(1);
-  useEffect(() => {
-    if (on) scale.value = withSequence(withTiming(1.14, { duration: 110 }), withSpring(1, { damping: 12, stiffness: 240 }));
-  }, [on, scale]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return <Animated.View style={style}>{children}</Animated.View>;
-}
 
 const LABELS: Record<string, string> = { index: "Home", battles: "Battles", notifications: "Activity", you: "You" };
 
@@ -42,8 +30,8 @@ function TabBar({ state, navigation }: { state: { index: number; routes: { key: 
       accessibilityState={{ selected: active }}
       style={{ flex: 1, height: 56, alignItems: "center", justifyContent: "center", gap: 2 }}
     >
-      {active && <Animated.View entering={ZoomIn.duration(180)} style={{ position: "absolute", top: 0, width: 24, height: 2, borderRadius: 2, backgroundColor: brand.ketchup }} />}
-      <Pop on={active}>{icon}</Pop>
+      {active && <View style={{ position: "absolute", top: 0, width: 24, height: 2, borderRadius: 2, backgroundColor: brand.ketchup }} />}
+      {icon}
       <T size={11} weight={600} color={active ? colors.foreground : colors.faint}>
         {label}
       </T>

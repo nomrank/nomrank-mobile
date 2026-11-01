@@ -10,6 +10,6 @@ The Android (and later iOS) app for Nomrank, an Indian food app where people rat
 - **Routes** mirror the web's paths (`/r/[slug]/[dish]`, `/review/[id]`, `/u/[handle]`, `/top/[slug]`), so `dishHref` and notification links work unchanged. Legal and About pages open on the website, so their wording lives in one place.
 - **Check on web:** `npx expo start --web` runs the app in a browser. It's for looking at screens only; Android is the target.
 - **Brand and product rules:** playful, Gen-Z tone, never region-vs-region framing. Leaderboard rank uses a Bayesian average. "Tastes like home" shows only with 3 or more ratings from the dish's home region.
-- **Versions:** `0.1.0` first test build. `versionCode` in `app.json` goes up by one for every build that gets installed over another.
+- **Versions:** Versions are `0.1.N`, N rising by one with every release (see the Version step in `.github/workflows/android.yml`). Releases stay pre-releases until the owner says otherwise.
 - **Commands:** `npx expo start` (open in Expo Go), `npx tsc --noEmit`, `npx expo-doctor`. Every push to `main` builds a test APK in GitHub Actions and publishes it under Releases.
 - Plan and task list: see `tasks/android-plan.md` and `tasks/android-todo.md` in the web repo (the numbering there still applies).

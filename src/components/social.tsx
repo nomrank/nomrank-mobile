@@ -1,50 +1,29 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useState, type ReactNode } from "react";
 import { FlatList, Pressable, ScrollView, Share, useWindowDimensions, View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { Image } from "expo-image";
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import { BookmarkIcon, CheckIcon, FlagIcon, MapPinIcon, MessageCircleIcon, Share2Icon, UserPlusIcon } from "lucide-react-native";
-import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import { BookmarkIcon, CheckIcon, FlagIcon, MapPinIcon, MessageCircleIcon, Share2Icon, UserPlusIcon, LinkIcon, type LucideIcon } from "lucide-react-native";
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { CITIES, type City } from "@/core/cities";
 import { dishHref } from "@/core/dishes";
-import { photoUrl, type Review, type Vote } from "@/core/ratings";
+import { formatScore, photoUrl, type Review, type Vote } from "@/core/ratings";
 import { timeAgo } from "@/core/time";
 import { REPORT_REASONS, type ReportTarget } from "@/core/validation";
 import { applyVote, leadingSide, type VoteState } from "@/core/votes";
 import { castVote, sendReport, setFollow, setSaved } from "@/lib/actions";
 import { useSession } from "@/lib/session";
-import { SITE } from "@/lib/supabase";
+import { SHARE_SITE } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
 import { AgreeIcon, Avatar, DietMark, DisagreeIcon, DishAvg, Score, Verdict } from "./marks";
 import { toast } from "./toast";
-import { Btn, Input, Sheet, T } from "./ui";
+import { Btn, Input, Press, Sheet, T } from "./ui";
 
 export const useGo = () => {
   const router = useRouter();
   return (href: string) => router.push(href as Href);
 };
-
-// A few crumbs thrown off the button. Transform and opacity only.
-function Crumb({ angle, color, left }: { angle: number; color: string; left: number }) {
-  const t = useSharedValue(0);
-  useEffect(() => {
-    t.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) });
-  }, [t]);
-  const style = useAnimatedStyle(() => ({ opacity: 1 - t.value, transform: [{ translateX: Math.cos(angle) * 30 * t.value }, { translateY: Math.sin(angle) * 30 * t.value }, { scale: 1 - t.value * 0.5 }] }));
-  return <Animated.View style={[{ position: "absolute", left, top: 16, width: 6, height: 6, borderRadius: 3, backgroundColor: color }, style]} />;
-}
-
-function Crumbs({ color, left }: { color: string; left: number }) {
-  const reduce = useReducedMotion();
-  if (reduce) return null;
-  return (
-    <>
-      {[-2.6, -2, -1.5, -1.1, -0.5, 0.2].map((a) => (
-        <Crumb key={a} angle={a} color={color} left={left} />
-      ))}
-    </>
-  );
-}
 
 const SIDES = [
   { kind: "facts" as const, label: "Agree", Icon: AgreeIcon, fill: brand.mustard },
@@ -52,12 +31,11 @@ const SIDES = [
 ];
 
 // Agree | Disagree as one joined control, and a quiet line for the winning side. On your own take it only shows the
-// counts. The tap answers at once with a pop, a few crumbs and a rolling count; the server catches up.
+// counts. The tap answers at once with a small pop and a rolling count; the server catches up.
 export function VoteButtons({ ratingId, facts, cap, mine, mode }: { ratingId: string; facts: number; cap: number; mine?: Vote; mode: "vote" | "own" }) {
   const { colors } = useTheme();
   const [state, setState] = useState<VoteState>({ facts, cap, mine });
   const pop = useSharedValue(1);
-  const [burst, setBurst] = useState<{ id: number; color: string; left: number } | null>(null);
   const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
   const lead = leadingSide(state.facts, state.cap);
 
@@ -68,7 +46,6 @@ export function VoteButtons({ ratingId, facts, cap, mine, mode }: { ratingId: st
     if (next.mine) {
       Haptics.selectionAsync();
       pop.value = withSequence(withTiming(1.08, { duration: 90 }), withTiming(1, { duration: 140 }));
-      setBurst({ id: Date.now(), color: kind === "facts" ? brand.mustard : brand.ketchup, left: kind === "facts" ? 30 : 100 });
     }
     castVote(ratingId, next.mine ?? null);
   }
@@ -102,7 +79,6 @@ export function VoteButtons({ ratingId, facts, cap, mine, mode }: { ratingId: st
           );
         })}
       </Animated.View>
-      {!!burst && <Crumbs key={burst.id} color={burst.color} left={burst.left} />}
       {lead && (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.hairline, overflow: "hidden" }}>
@@ -239,11 +215,10 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
             </T>
           </Pressable>
         )}
-        {saved !== undefined && (
-          <View style={{ marginLeft: "auto" }}>
-            <SaveButton dishId={r.dish.id} saved={saved} compact={!full} />
-          </View>
-        )}
+        <View style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center" }}>
+          <ShareTake review={r} compact={!full} size={18} />
+          {saved !== undefined && <SaveButton dishId={r.dish.id} saved={saved} compact={!full} />}
+        </View>
       </View>
     </Pressable>
   );
@@ -324,12 +299,112 @@ export function FollowButton({ followeeId, handle, following: initial, onChange 
   return <Btn label={following ? "Following" : "Follow"} icon={following ? CheckIcon : UserPlusIcon} variant={following ? "secondary" : "primary"} onPress={press} accessibilityLabel={following ? `Unfollow @${handle}` : `Follow @${handle}`} style={{ minHeight: 40, paddingHorizontal: 14 }} />;
 }
 
-export function ShareButton({ path, title }: { path: string; title: string }) {
+// The share sheet, the way X does it: a preview of what's being shared, then Copy link and Share via. The link carries the
+// website's preview card (the dish photo, the score), so it looks right wherever it lands.
+export function ShareSheet({ open, onClose, url, message, preview }: { open: boolean; onClose: () => void; url: string; message: string; preview: ReactNode }) {
+  const { colors } = useTheme();
+  async function copy() {
+    await Clipboard.setStringAsync(url);
+    Haptics.selectionAsync();
+    onClose();
+    toast("Link copied");
+  }
+  async function via() {
+    onClose();
+    // Android takes one string, so the link goes in the message.
+    await Share.share({ message: `${message}\n${url}` }).catch(() => {});
+  }
+  const action = (Icon: LucideIcon, label: string, run: () => void) => (
+    <Press onPress={run} accessibilityRole="button" accessibilityLabel={label} to={0.985} style={{ minHeight: 56, flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 4 }}>
+      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.raised, alignItems: "center", justifyContent: "center" }}>
+        <Icon size={19} color={colors.foreground} />
+      </View>
+      <T weight={600}>{label}</T>
+    </Press>
+  );
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <View style={{ borderRadius: 16, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.background, padding: 14, marginBottom: 8 }}>{preview}</View>
+      {action(LinkIcon, "Copy link", copy)}
+      {action(Share2Icon, "Share via…", via)}
+      <T size={12} color={colors.faint} numberOfLines={1} ellipsizeMode="middle" style={{ textAlign: "center", marginTop: 6 }}>
+        {url.replace(/^https?:\/\//, "")}
+      </T>
+    </Sheet>
+  );
+}
+
+// The share icon. Tapping it opens the sheet above. `preview` is what the sheet shows; without one it shows the title.
+export function ShareButton({ path, title, preview, size = 20, compact }: { path: string; title: string; preview?: ReactNode; size?: number; compact?: boolean }) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="Share" hitSlop={compact ? 6 : 0} style={{ width: compact ? 38 : 44, height: compact ? 38 : 44, alignItems: "center", justifyContent: "center" }}>
+        <Share2Icon size={size} color={compact ? colors.muted : colors.foreground} />
+      </Pressable>
+      <ShareSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        url={`${SHARE_SITE}${path}`}
+        message={title}
+        preview={
+          preview ?? (
+            <T weight={600} style={{ lineHeight: 21 }}>
+              {title}
+            </T>
+          )
+        }
+      />
+    </>
+  );
+}
+
+// A take as the sheet shows it: who said it, what, and the dish with its score.
+function TakePreview({ r }: { r: Review }) {
   const { colors } = useTheme();
   return (
-    <Pressable onPress={() => Share.share({ message: `${title} ${SITE}${path}` })} accessibilityRole="button" accessibilityLabel="Share" style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
-      <Share2Icon size={20} color={colors.foreground} />
-    </Pressable>
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Avatar handle={r.author.username} code={r.author.avatar} photo={r.author.avatar_path} size={28} />
+        <T size={14} weight={600}>
+          @{r.author.username}
+        </T>
+        <T size={13} color={colors.faint}>
+          {timeAgo(r.created_at)}
+        </T>
+      </View>
+      {!!r.take && (
+        <T numberOfLines={4} style={{ lineHeight: 22 }}>
+          {r.take}
+        </T>
+      )}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.hairline }}>
+        <Score score={r.score} size={44} />
+        <View style={{ flex: 1 }}>
+          <T size={14} weight={700} numberOfLines={1}>
+            {r.dish.name}
+          </T>
+          <T size={13} color={colors.muted} numberOfLines={1}>
+            {r.dish.restaurant.name} · {r.dish.restaurant.city}
+          </T>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// Share a take: the icon on every card and on the take's own page.
+export function ShareTake({ review: r, compact, size }: { review: Review; compact?: boolean; size?: number }) {
+  const snippet = r.take && r.take.length > 90 ? `${r.take.slice(0, 88).trimEnd()}…` : r.take;
+  return (
+    <ShareButton
+      path={`/review/${r.id}`}
+      title={`@${r.author.username} gave ${r.dish.name} at ${r.dish.restaurant.name} a ${formatScore(r.score)}/10${snippet ? `: “${snippet}”` : ""}`}
+      preview={<TakePreview r={r} />}
+      compact={compact}
+      size={size}
+    />
   );
 }
 
