@@ -3,6 +3,7 @@ import { AppState, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter, type Href } from "expo-router";
 import { unreadCount } from "@/core/notifications";
+import { loadFollowing } from "./following";
 import { registerPush } from "./notify";
 import { once } from "./once";
 import { useSession } from "./session";
@@ -45,6 +46,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   useEffect(() => {
+    loadFollowing(userId).catch(() => {});
     if (Platform.OS === "web") return;
     if (userId) registerPush(userId).catch(() => {});
     // The same tap can arrive both as the last response and through the listener.

@@ -5,7 +5,7 @@ import { Image } from "expo-image";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { BookmarkIcon, CheckIcon, FlagIcon, MapPinIcon, MessageCircleIcon, Share2Icon, UserPlusIcon, LinkIcon, type LucideIcon } from "lucide-react-native";
-import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from "react-native-reanimated";
 import { CITIES, type City } from "@/core/cities";
 import { dishHref } from "@/core/dishes";
 import { formatScore, photoUrl, type Review, type Vote } from "@/core/ratings";
@@ -14,6 +14,7 @@ import { REPORT_REASONS, type ReportTarget } from "@/core/validation";
 import { applyVote, leadingSide, type VoteState } from "@/core/votes";
 import { castVote, sendReport, setFollow, setSaved } from "@/lib/actions";
 import { useSession } from "@/lib/session";
+import { follow, markFollowing, useFollows } from "@/lib/following";
 import { once } from "@/lib/once";
 import { SHARE_SITE } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
@@ -99,6 +100,36 @@ export function VoteButtons({ vote: { state, press, pop, mode } }: { vote: Retur
         </View>
       )}
     </View>
+  );
+}
+
+// Beside a name in the feed: a quiet Follow, which turns into a small Following badge. Unfollowing stays on their profile, so a
+// stray tap in the feed can't undo it.
+function FollowChip({ id, handle }: { id: string; handle: string }) {
+  const { colors } = useTheme();
+  const { userId } = useSession();
+  const following = useFollows(id);
+  if (!userId || id === userId) return null;
+  if (following)
+    return (
+      <Animated.View entering={FadeIn.duration(160)} accessibilityLabel={`Following @${handle}`} style={{ height: 20, paddingHorizontal: 7, borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: colors.raised }}>
+        <CheckIcon size={11} color={colors.mustardInk} strokeWidth={3} />
+        <T size={11} weight={600} color={colors.muted}>
+          Following
+        </T>
+      </Animated.View>
+    );
+  function press() {
+    if (!once(`follow:${id}`)) return;
+    Haptics.selectionAsync();
+    follow(id).catch(() => toast("Couldn't do that just now. Try again."));
+  }
+  return (
+    <Pressable onPress={press} accessibilityRole="button" accessibilityLabel={`Follow @${handle}`} hitSlop={12}>
+      <T size={13} weight={700} color={colors.mustardInk}>
+        Follow
+      </T>
+    </Pressable>
   );
 }
 
@@ -213,6 +244,7 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
   const byline = (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
       <PersonLink handle={r.author.username} avatar={r.author.avatar} photo={r.author.avatar_path} />
+      <FollowChip id={r.author.id} handle={r.author.username} />
       <T size={13} color={colors.faint}>
         {timeAgo(r.created_at)}
       </T>
@@ -325,6 +357,7 @@ export function MealCard({ reviews, votes }: { reviews: Review[]; votes: Record<
           </T>
           <T size={14} color={colors.muted}>{` in ${dish.restaurant.city}`}</T>
         </T>
+        <FollowChip id={author.id} handle={author.username} />
         <T size={13} color={colors.faint}>
           {timeAgo(latest)}
         </T>
@@ -370,8 +403,10 @@ export function FollowButton({ followeeId, handle, following: initial, onChange 
   function press() {
     set(!following);
     onChange?.(!following);
+    markFollowing(followeeId, !following);
     setFollow(followeeId, !following).catch(() => {
       set(following);
+      markFollowing(followeeId, following);
       toast("Couldn't do that just now. Try again.");
     });
   }

@@ -12,7 +12,7 @@ export type Review = {
   cap_count: number;
   comments_count: number;
   created_at: string;
-  author: { username: string; avatar: string | null; avatar_path: string | null };
+  author: { id: string; username: string; avatar: string | null; avatar_path: string | null };
   dish: { id: string; name: string; diet: DishDiet; rating_count: number; avg_score: number | null; restaurant: { slug: string; name: string; area: string; city: string } };
   photos: { path: string; position: number }[];
 };
@@ -21,7 +21,7 @@ export type FeedSort = Sort | "following";
 
 // dishes!inner: a take only shows when its dish does (dishes waiting for approval are hidden from everyone but their creator).
 const REVIEW_FIELDS =
-  "id, score, take, facts_count, cap_count, comments_count, created_at, author:profiles!ratings_user_id_fkey(username, avatar, avatar_path), dish:dishes!inner(id, name, diet, rating_count, avg_score, restaurant:restaurants!inner(slug, name, area, city)), photos:rating_photos(path, position)";
+  "id, score, take, facts_count, cap_count, comments_count, created_at, author:profiles!ratings_user_id_fkey(id, username, avatar, avatar_path), dish:dishes!inner(id, name, diet, rating_count, avg_score, restaurant:restaurants!inner(slug, name, area, city)), photos:rating_photos(path, position)";
 
 export const FEED_PAGE = 20;
 
