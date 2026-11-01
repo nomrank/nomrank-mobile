@@ -14,16 +14,20 @@ import { REPORT_REASONS, type ReportTarget } from "@/core/validation";
 import { applyVote, leadingSide, type VoteState } from "@/core/votes";
 import { castVote, sendReport, setFollow, setSaved } from "@/lib/actions";
 import { useSession } from "@/lib/session";
+import { once } from "@/lib/once";
 import { SHARE_SITE } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
 import { AgreeIcon, Avatar, DietMark, DisagreeIcon, DishAvg, Score, Verdict } from "./marks";
 import { toast } from "./toast";
 import { PhotoViewer } from "./photo-viewer";
+import { PinchZoom } from "./pinch-zoom";
 import { Btn, Input, Press, Sheet, T } from "./ui";
 
 export const useGo = () => {
   const router = useRouter();
-  return (href: string) => router.push(href as Href);
+  return (href: string) => {
+    if (once(`go:${href}`)) router.push(href as Href);
+  };
 };
 
 const SIDES = [
@@ -38,7 +42,7 @@ export function useVote(ratingId: string, facts: number, cap: number, mine: Vote
   const pop = useSharedValue(1);
   useEffect(() => setState((s) => (s.mine === mine ? s : { ...s, mine })), [mine]); // your votes arrive after the feed does
   function press(kind: Vote) {
-    if (mode === "own") return;
+    if (mode === "own" || !once(`vote:${ratingId}`, 400)) return;
     const next = applyVote(state, kind);
     setState(next);
     if (next.mine) {
@@ -111,28 +115,46 @@ export function PersonLink({ handle, avatar, photo, size = 24 }: { handle: strin
   );
 }
 
+// Every photo shows at the same 4:5, cropped to fill; full screen shows the whole picture.
+const PHOTO_RATIO = 5 / 4;
+
+// One photo in the feed: one tap opens it full screen, two tap agree, two fingers pinch it.
+function FeedPhoto({ path, label, width, height, onTap, onPinch }: { path: string; label: string; width: number; height: number; onTap: () => void; onPinch: (on: boolean) => void }) {
+  const uri = photoUrl(path);
+  return (
+    <PinchZoom uri={uri} onActive={onPinch}>
+      <Pressable onPress={onTap} accessibilityRole="imagebutton" accessibilityLabel={label}>
+        <Image source={uri} style={{ width, height }} contentFit="cover" transition={150} recyclingKey={path} />
+      </Pressable>
+    </PinchZoom>
+  );
+}
+
 // Swipe through a take's photos, with dots when there are several.
-export function PhotoCarousel({ photos, dish, onAgree, width }: { photos: { path: string }[]; dish: string; onAgree?: () => void; width: number }) {
+export function PhotoCarousel({ photos, dish, onAgree, width, rounded }: { photos: { path: string }[]; dish: string; onAgree?: () => void; width: number; rounded?: boolean }) {
   const { colors } = useTheme();
   const [at, setAt] = useState(0);
   const [viewing, setViewing] = useState<number | null>(null);
-  const height = (width * 3) / 4;
+  const [pinching, setPinching] = useState(false);
+  const height = width * PHOTO_RATIO;
   const tap = useTap(onAgree);
+  const photo = (path: string, index: number) => <FeedPhoto path={path} label={`Photo ${index + 1} of ${dish}. Opens full screen`} width={width} height={height} onTap={() => tap(() => setViewing(index))} onPinch={setPinching} />;
   return (
-    <View style={{ width, height, borderRadius: 12, overflow: "hidden", backgroundColor: colors.raised }}>
-      <FlatList
-        data={photos}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(p) => p.path}
-        onMomentumScrollEnd={(e) => setAt(Math.round(e.nativeEvent.contentOffset.x / width))}
-        renderItem={({ item, index }) => (
-          <Pressable onPress={() => tap(() => setViewing(index))} accessibilityRole="imagebutton" accessibilityLabel={`Photo ${index + 1} of ${dish}. Opens full screen`}>
-            <Image source={photoUrl(item.path)} style={{ width, height }} contentFit="cover" transition={150} recyclingKey={item.path} />
-          </Pressable>
-        )}
-      />
+    <View style={{ width, height, borderRadius: rounded ? 12 : 0, overflow: "hidden", backgroundColor: colors.raised }}>
+      {photos.length === 1 ? (
+        photo(photos[0].path, 0)
+      ) : (
+        <FlatList
+          data={photos}
+          horizontal
+          pagingEnabled
+          scrollEnabled={!pinching}
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(p) => p.path}
+          onMomentumScrollEnd={(e) => setAt(Math.round(e.nativeEvent.contentOffset.x / width))}
+          renderItem={({ item, index }) => photo(item.path, index)}
+        />
+      )}
       {photos.length > 1 && (
         <View pointerEvents="none" style={{ position: "absolute", bottom: 8, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 4 }}>
           {photos.map((p, i) => (
@@ -140,7 +162,7 @@ export function PhotoCarousel({ photos, dish, onAgree, width }: { photos: { path
           ))}
         </View>
       )}
-      <PhotoViewer paths={photos.map((p) => p.path)} start={viewing} onClose={() => setViewing(null)} />
+      {viewing !== null && <PhotoViewer paths={photos.map((p) => p.path)} start={viewing} onClose={() => setViewing(null)} />}
     </View>
   );
 }
@@ -154,12 +176,12 @@ function useTap(double?: () => void) {
     if (!double) return single?.();
     const now = Date.now();
     clearTimeout(timer.current);
-    if (now - last.current < 300) {
+    if (now - last.current < 260) {
       last.current = 0;
       return double();
     }
     last.current = now;
-    timer.current = setTimeout(() => single?.(), 300);
+    timer.current = setTimeout(() => single?.(), 260);
   };
 }
 
@@ -209,8 +231,7 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
         };
   const tap = useTap(agree);
   return (
-    <Pressable onPress={open} disabled={full} style={{ paddingVertical: 16, gap: 10 }}>
-      <Burst k={burst} />
+    <Pressable onPress={() => tap(open)} accessible={!full} style={{ paddingVertical: 16, gap: 10 }}>
       {!showDish && (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           {byline}
@@ -248,17 +269,19 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
             </View>
           )}
           {!!r.take && (
-            <Pressable onPress={() => tap(open)} accessible={false}>
-              <T size={15} numberOfLines={full ? undefined : 6} style={{ lineHeight: 23 }}>
-                {r.take}
-              </T>
-            </Pressable>
+            <T size={15} numberOfLines={full ? undefined : 6} style={{ lineHeight: 23 }}>
+              {r.take}
+            </T>
           )}
-          {r.photos.length > 0 && <PhotoCarousel photos={r.photos} dish={r.dish.name} onAgree={agree} width={full ? width - 40 : Math.min(width - 130, 288)} />}
           {showDish && !inMeal && byline}
         </View>
         {showDish && <Score score={r.score} size={full ? 76 : inMeal ? 54 : 64} />}
       </View>
+      {r.photos.length > 0 && (
+        <View style={inMeal ? undefined : { marginHorizontal: -20 }}>
+          <PhotoCarousel photos={r.photos} dish={r.dish.name} onAgree={agree} width={inMeal ? width - 71 : width} rounded={inMeal} />
+        </View>
+      )}
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
         <VoteButtons vote={voting} />
         {!full && (
@@ -274,6 +297,7 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
           {saved !== undefined && <SaveButton dishId={r.dish.id} saved={saved} compact={!full} />}
         </View>
       </View>
+      <Burst k={burst} />
     </Pressable>
   );
 });
@@ -321,6 +345,7 @@ export function SaveButton({ dishId, saved: initial, compact }: { dishId: string
   const { colors } = useTheme();
   const [saved, set] = useState(initial);
   function press() {
+    if (!once(`save:${dishId}`, 400)) return;
     set(!saved);
     Haptics.selectionAsync();
     setSaved(dishId, !saved).catch(() => {
@@ -397,18 +422,20 @@ export function ShareButton({ path, title, preview, size = 20, compact }: { path
       <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="Share" hitSlop={compact ? 6 : 0} style={{ width: compact ? 38 : 44, height: compact ? 38 : 44, alignItems: "center", justifyContent: "center" }}>
         <Share2Icon size={size} color={compact ? colors.muted : colors.foreground} />
       </Pressable>
-      <ShareSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        url={`${SHARE_SITE}${path}`}
-        preview={
-          preview ?? (
-            <T weight={600} style={{ lineHeight: 21 }}>
-              {title}
-            </T>
-          )
-        }
-      />
+      {open && (
+        <ShareSheet
+          open
+          onClose={() => setOpen(false)}
+          url={`${SHARE_SITE}${path}`}
+          preview={
+            preview ?? (
+              <T weight={600} style={{ lineHeight: 21 }}>
+                {title}
+              </T>
+            )
+          }
+        />
+      )}
     </>
   );
 }

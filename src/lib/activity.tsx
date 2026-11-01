@@ -3,7 +3,8 @@ import { AppState, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter, type Href } from "expo-router";
 import { unreadCount } from "@/core/notifications";
-import { notifyNew, registerPush, watchInBackground } from "./notify";
+import { registerPush } from "./notify";
+import { once } from "./once";
 import { useSession } from "./session";
 import { supabase } from "./supabase";
 
@@ -14,12 +15,12 @@ export const useActivity = () => useContext(ActivityContext);
 
 if (Platform.OS !== "web") {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
+    handleNotification: async () => ({ shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false }),
   });
 }
 
-// The Activity badge, and a phone notification for anything new. While the app is open it checks every 30 seconds; when
-// it's closed, the background check in notify.ts takes over.
+// The Activity badge. Phone notifications come from the server (send-push); while the app is open they refresh the badge instead
+// of showing a banner, and it also checks every 30 seconds.
 export function ActivityProvider({ children }: { children: ReactNode }) {
   const { userId, profile } = useSession();
   const router = useRouter();
@@ -31,7 +32,6 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
     const count = await unreadCount(supabase, userId).catch(() => null);
     if (count === null) return;
     setUnread(count);
-    notifyNew(userId).catch(() => {});
   }, [userId, signedIn]);
 
   useEffect(() => {
@@ -46,11 +46,11 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (Platform.OS === "web") return;
-    watchInBackground().catch(() => {});
     if (userId) registerPush(userId).catch(() => {});
+    // The same tap can arrive both as the last response and through the listener.
     const open = (r: Notifications.NotificationResponse | null) => {
       const href = r?.notification.request.content.data?.href;
-      if (typeof href === "string") router.push(href as Href);
+      if (r && typeof href === "string" && once(`tap:${r.notification.request.identifier}`, 60000)) router.push(href as Href);
     };
     // Tapped while the app was closed. Cleared after use, or it would reopen on every launch.
     Notifications.getLastNotificationResponseAsync().then((r) => {
@@ -58,8 +58,12 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
       if (r) Notifications.clearLastNotificationResponseAsync();
     });
     const sub = Notifications.addNotificationResponseReceivedListener(open);
-    return () => sub.remove();
-  }, [router, userId]);
+    const arrived = Notifications.addNotificationReceivedListener(() => refresh());
+    return () => {
+      sub.remove();
+      arrived.remove();
+    };
+  }, [router, userId, refresh]);
 
   return <ActivityContext.Provider value={{ unread, refresh }}>{children}</ActivityContext.Provider>;
 }

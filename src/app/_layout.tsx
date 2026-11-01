@@ -10,10 +10,10 @@ import { Geist_400Regular, Geist_500Medium, Geist_600SemiBold, Geist_700Bold, Ge
 import { PlusJakartaSans_800ExtraBold } from "@expo-google-fonts/plus-jakarta-sans";
 import { DMSerifDisplay_400Regular } from "@expo-google-fonts/dm-serif-display";
 import { Loader } from "@/components/loader";
+import { PinchHost } from "@/components/pinch-zoom";
 import { DialogHost } from "@/components/dialog";
 import { Toaster } from "@/components/toast";
 import { IntroContext, INTRO_KEY, PERMISSIONS_KEY, takeLink } from "@/lib/intro";
-import "@/lib/notify"; // defines the background check at launch, including when Android starts the app just for it
 import { SessionProvider, useSession } from "@/lib/session";
 import { ThemeProvider, useTheme } from "@/theme";
 
@@ -104,6 +104,7 @@ function Routes() {
             <Stack.Screen name="login" />
           </Stack.Protected>
         </Stack>
+        <PinchHost />
         <Toaster />
         <DialogHost />
       </View>

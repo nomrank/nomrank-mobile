@@ -13,7 +13,7 @@ import { Btn, Failed, Loading, Press, T, useData } from "@/components/ui";
 import { voteBattle } from "@/lib/actions";
 import { useScrollToTopOnTab } from "@/lib/scroll";
 import { useSession } from "@/lib/session";
-import { SITE, supabase } from "@/lib/supabase";
+import { SHARE_SITE, supabase } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
 
 // FlatList throws if this object changes between renders, so it lives out here.
@@ -80,7 +80,7 @@ const BattleCard = memo(function BattleCard({ battle: b, index, total, height, s
   const s = split(b.votes);
   const close = s.n >= 4 && Math.abs(b.votes.a - b.votes.b) <= 1;
   const list = b.a.list === b.b.list ? b.a.list : null;
-  const share = () => Share.share({ message: `${b.a.name} at ${b.a.place} or ${b.b.name} at ${b.b.place}? Pick one on Nomrank. ${SITE}/battles?b=${b.id}` });
+  const share = () => Share.share({ message: `${b.a.name} at ${b.a.place} or ${b.b.name} at ${b.b.place}? Pick one on Nomrank. ${SHARE_SITE}/battles?b=${b.id}` });
   return (
     <View accessibilityLabel={`Battle ${index + 1} of ${total}: ${b.tag}`} style={{ height, paddingHorizontal: 20, justifyContent: "center", gap: 18 }}>
       <View style={{ alignItems: "center", gap: 6 }}>

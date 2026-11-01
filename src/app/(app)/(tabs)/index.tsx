@@ -25,6 +25,7 @@ import { brand, useTheme } from "@/theme";
 type View_ = "takes" | "rankings" | "dishes" | "places";
 const TABS = [["takes", "Takes"], ["rankings", "Rankings"], ["dishes", "Dishes"], ["places", "Places"]] as const;
 type Item = { key: string; node: () => ReactNode };
+const WAIT: Item[] = [{ key: "wait", node: () => <Loading /> }];
 
 function DishGroupRow({ group: g, href }: { group: DishGroup; href: (s: DishGroup["spots"][number]) => string }) {
   const { colors } = useTheme();
@@ -104,7 +105,7 @@ export default function Home() {
   const { userId, profile, city, prefs } = useSession();
   const router = useRouter();
   const go = useGo();
-  // The tab row answers at once; the list under it catches up a beat later, so switching never stalls the underline.
+  // The tab row answers at once and the loader shows; the list renders behind it, so switching never stalls.
   const [tab, setTab] = useState<View_>("takes");
   const view = useDeferredValue(tab);
   const list = useRef<FlatList<Item>>(null);
@@ -255,9 +256,9 @@ export default function Home() {
         ref={list}
         onScroll={keep.onScroll}
         scrollEventThrottle={32}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        data={items}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        data={tab === view ? items : WAIT}
         keyExtractor={(i) => i.key}
         renderItem={renderItem}
         keyboardShouldPersistTaps="handled"

@@ -5,6 +5,7 @@ import { BellIcon, HomeIcon, PlusIcon, SwordsIcon } from "lucide-react-native";
 import { Avatar } from "@/components/marks";
 import { T } from "@/components/ui";
 import { useActivity } from "@/lib/activity";
+import { once } from "@/lib/once";
 import { tabPressed } from "@/lib/scroll";
 import { useSession } from "@/lib/session";
 import { brand, useTheme } from "@/theme";
@@ -47,7 +48,7 @@ function TabBar({ state }: { state: { index: number; routes: { key: string; name
       {tab("battles", current === "battles", <SwordsIcon size={22} color={ink("battles")} />, LABELS.battles)}
       {profile && (
         <>
-          <Pressable onPress={() => router.push("/rate")} accessibilityRole="button" accessibilityLabel="Rate a dish" style={{ flex: 1, height: 56, alignItems: "center" }}>
+          <Pressable onPress={() => once("go:/rate") && router.push("/rate")} accessibilityRole="button" accessibilityLabel="Rate a dish" style={{ flex: 1, height: 56, alignItems: "center" }}>
             {({ pressed }) => (
               <View style={{ position: "absolute", top: -16, width: 52, height: 52, borderRadius: 26, backgroundColor: brand.ketchup, alignItems: "center", justifyContent: "center", elevation: 6, transform: [{ scale: pressed ? 0.92 : 1 }] }}>
                 <PlusIcon size={26} color={brand.studio} strokeWidth={2.75} />

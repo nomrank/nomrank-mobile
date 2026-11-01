@@ -15,7 +15,7 @@ import { DietMark, DishAvg, Score } from "@/components/marks";
 import { ScoreMeter } from "@/components/score-meter";
 import { confirm } from "@/components/dialog";
 import { toast } from "@/components/toast";
-import { Btn, Card, Empty, Failed, Header, Input, Loading, Overline, Press, Row, Sheet, T, useData } from "@/components/ui";
+import { Btn, Card, Empty, Failed, Header, Input, Loading, Overline, Press, Row, SendButton, Sheet, T, useData } from "@/components/ui";
 import { pickFromLibrary, saveRating, takePhoto, type PhotoDraft, type Posted } from "@/lib/actions";
 import { groupDishes } from "@/lib/home";
 import { useSession } from "@/lib/session";
@@ -255,7 +255,7 @@ function RateForm({ dish, existing }: { dish: DishDetail; existing: { score: num
 
   async function submit() {
     if (!score) return setError("Pick a score from 0.5 to 10.");
-    if (!userId) return;
+    if (!userId || busy) return;
     setError(undefined);
     setBusy(true);
     const r = await saveRating(userId, profile?.regions?.name, dish.id, { score, take }, changed ? photos : null);
@@ -288,7 +288,10 @@ function RateForm({ dish, existing }: { dish: DishDetail; existing: { score: num
               (optional)
             </T>
           </T>
-          <Input value={take} onChangeText={(s) => setTake(s.slice(0, MAX_TAKE))} multiline placeholder="What did you think?" accessibilityLabel="Hot take" style={{ minHeight: 110, paddingVertical: 12, textAlignVertical: "top" }} />
+          <View>
+            <Input value={take} onChangeText={(s) => setTake(s.slice(0, MAX_TAKE))} multiline returnKeyType="send" submitBehavior="submit" onSubmitEditing={submit} placeholder="What did you think?" accessibilityLabel="Hot take" style={{ minHeight: 110, paddingVertical: 12, paddingRight: 52, textAlignVertical: "top" }} />
+            <SendButton label="Post it" busy={busy} disabled={!take.trim()} onPress={submit} style={{ position: "absolute", right: 8, bottom: 8 }} />
+          </View>
           <T size={14} color={colors.muted} style={{ textAlign: "right" }}>
             {take.length}/{MAX_TAKE}
           </T>

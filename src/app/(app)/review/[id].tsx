@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { confirm } from "@/components/dialog";
 import { KeyboardAvoidingView, Pressable, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -13,7 +13,7 @@ import { toggleVote } from "@/core/votes";
 import { RateAnother } from "@/components/rate-another";
 import { PersonLink, ReportButton, ReviewCard, ShareTake, useGo } from "@/components/social";
 import { toast } from "@/components/toast";
-import { Btn, Empty, Failed, Header, Input, Loading, Overline, T, useData } from "@/components/ui";
+import { Btn, Empty, Failed, Header, Input, Loading, Overline, T, useData, SendButton } from "@/components/ui";
 import { addComment, castCommentVote, deleteComment, deleteRating } from "@/lib/actions";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -22,12 +22,16 @@ import { useTheme } from "@/theme";
 function Composer({ ratingId, parentId, placeholder, start = "", onPosted, onCancel }: { ratingId: string; parentId?: string; placeholder: string; start?: string; onPosted: () => void; onCancel?: () => void }) {
   const { colors } = useTheme();
   const [body, setBody] = useState(start);
+  const sending = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function post() {
+    if (sending.current || !body.trim()) return;
+    sending.current = true;
     setBusy(true);
     const failed = await addComment(ratingId, parentId ?? null, body);
+    sending.current = false;
     setBusy(false);
     setError(failed);
     if (failed) return;
@@ -37,14 +41,18 @@ function Composer({ ratingId, parentId, placeholder, start = "", onPosted, onCan
   }
   return (
     <View style={{ gap: 8 }}>
-      <Input value={body} onChangeText={setBody} maxLength={500} multiline placeholder={placeholder} accessibilityLabel={placeholder} autoFocus={!!parentId} style={{ minHeight: parentId ? 60 : 76, paddingVertical: 10, textAlignVertical: "top" }} />
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <T size={13} color={error ? colors.destructive : colors.faint} style={{ flex: 1 }}>
-          {error ?? (body.length > 400 ? `${body.length}/500` : "")}
-        </T>
-        {onCancel && <Btn label="Cancel" variant="ghost" onPress={onCancel} style={{ minHeight: 40 }} />}
-        <Btn label={parentId ? "Reply" : "Post"} busy={busy} disabled={!body.trim()} onPress={post} style={{ minHeight: 40 }} />
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
+        <Input value={body} onChangeText={setBody} maxLength={500} multiline returnKeyType="send" submitBehavior="submit" onSubmitEditing={post} placeholder={placeholder} accessibilityLabel={placeholder} autoFocus={!!parentId} style={{ flex: 1, paddingVertical: 10, textAlignVertical: "top" }} />
+        <SendButton label={parentId ? "Post reply" : "Post comment"} busy={busy} disabled={!body.trim()} onPress={post} style={{ marginBottom: 4 }} />
       </View>
+      {(onCancel || error || body.length > 400) && (
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <T size={13} color={error ? colors.destructive : colors.faint} style={{ flex: 1 }}>
+            {error ?? (body.length > 400 ? `${body.length}/500` : "")}
+          </T>
+          {onCancel && <Btn label="Cancel" variant="ghost" onPress={onCancel} style={{ minHeight: 40 }} />}
+        </View>
+      )}
     </View>
   );
 }

@@ -98,7 +98,6 @@
           "color": "#ff4b3a"
         }
       ],
-      "expo-background-task",
       [
         "expo-build-properties",
         {

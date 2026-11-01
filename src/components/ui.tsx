@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Modal, Pressable, Text, TextInput, View, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react-native";
+import { ArrowLeftIcon, ChevronRightIcon, SendIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, SlideInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { FoxLoader } from "./loader";
@@ -17,12 +17,18 @@ type TProps = TextProps & { size?: number; weight?: keyof typeof FONT; color?: s
 const APressable = Animated.createAnimatedComponent(Pressable);
 
 // A pressable that gives under the finger: quick down, a little slower back.
-export function Press({ style, onPressIn, onPressOut, to = 0.97, ...rest }: Omit<PressableProps, "style"> & { style?: StyleProp<ViewStyle>; to?: number }) {
+export function Press({ style, onPress, onPressIn, onPressOut, to = 0.97, ...rest }: Omit<PressableProps, "style"> & { style?: StyleProp<ViewStyle>; to?: number }) {
   const scale = useSharedValue(1);
+  const last = useRef(0);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <APressable
       {...rest}
+      onPress={(e) => {
+        if (e.timeStamp - last.current < 500) return; // a double tap is one action
+        last.current = e.timeStamp;
+        onPress?.(e);
+      }}
       onPressIn={(e) => {
         scale.value = withTiming(to, { duration: 90 });
         onPressIn?.(e);
@@ -79,6 +85,16 @@ export function Btn({ label, variant = "primary", busy, icon: Icon, disabled, st
       <T size={15} weight={600} color={ink}>
         {label}
       </T>
+    </Press>
+  );
+}
+
+// The small round send arrow beside a comment box or take.
+export function SendButton({ label, busy, disabled, onPress, style }: { label: string; busy?: boolean; disabled?: boolean; onPress: () => void; style?: StyleProp<ViewStyle> }) {
+  const { colors } = useTheme();
+  return (
+    <Press onPress={onPress} disabled={disabled || busy} to={0.9} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }} style={[{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: disabled ? colors.raised : brand.ketchup }, style]}>
+      {busy ? <FoxLoader size={22} /> : <SendIcon size={17} color={disabled ? colors.faint : brand.studio} />}
     </Press>
   );
 }

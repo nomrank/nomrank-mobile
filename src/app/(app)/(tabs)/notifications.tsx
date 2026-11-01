@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { FlatList, Pressable, RefreshControl, View } from "react-native";
+import * as Notifications from "expo-notifications";
 import * as WebBrowser from "expo-web-browser";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CheckIcon, MessageCircleIcon, ShieldIcon, UserPlusIcon } from "lucide-react-native";
@@ -66,6 +67,7 @@ export default function Activity() {
 
   useEffect(() => {
     if (data?.some((n) => !n.read_at) && userId) markAllRead(userId).then(() => refresh());
+    Notifications.dismissAllNotificationsAsync().catch(() => {});
   }, [data, userId, refresh]);
 
   const renderItem = useCallback(({ item }: { item: Notification }) => <Item n={item} />, []);
