@@ -3,7 +3,6 @@ import { FlatList, Pressable, ScrollView, Share, useWindowDimensions, View } fro
 import { useRouter, type Href } from "expo-router";
 import { Image } from "expo-image";
 import * as Clipboard from "expo-clipboard";
-import * as Haptics from "expo-haptics";
 import { BookmarkIcon, CheckIcon, FlagIcon, MapPinIcon, MessageCircleIcon, Share2Icon, UserPlusIcon, LinkIcon, type LucideIcon } from "lucide-react-native";
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from "react-native-reanimated";
 import { CITIES, type City } from "@/core/cities";
@@ -15,14 +14,15 @@ import { applyVote, leadingSide, type VoteState } from "@/core/votes";
 import { castVote, sendReport, setFollow, setSaved } from "@/lib/actions";
 import { useSession } from "@/lib/session";
 import { follow, markFollowing, useFollows } from "@/lib/following";
+import { haptic } from "@/lib/haptics";
 import { once } from "@/lib/once";
 import { SHARE_SITE } from "@/lib/supabase";
 import { brand, useTheme } from "@/theme";
 import { AgreeIcon, Avatar, DietMark, DisagreeIcon, DishAvg, Score, Verdict } from "./marks";
 import { toast } from "./toast";
-import { PhotoViewer } from "./photo-viewer";
+import { CountBadge, PhotoViewer } from "./photo-viewer";
 import { PinchZoom } from "./pinch-zoom";
-import { Btn, Input, Press, Sheet, T } from "./ui";
+import { APressable, Btn, Input, Press, Sheet, T } from "./ui";
 
 export const useGo = () => {
   const router = useRouter();
@@ -47,7 +47,7 @@ export function useVote(ratingId: string, facts: number, cap: number, mine: Vote
     const next = applyVote(state, kind);
     setState(next);
     if (next.mine) {
-      Haptics.selectionAsync();
+      haptic.tap();
       pop.value = withSequence(withTiming(1.08, { duration: 90 }), withTiming(1, { duration: 140 }));
     }
     castVote(ratingId, next.mine ?? null);
@@ -68,14 +68,14 @@ export function VoteButtons({ vote: { state, press, pop, mode } }: { vote: Retur
           const count = kind === "facts" ? state.facts : state.cap;
           const ink = on ? brand.studio : colors.muted;
           return (
-            <Pressable
+            <APressable
               key={kind}
               onPress={() => press(kind)}
               disabled={mode === "own"}
               accessibilityRole="button"
               accessibilityLabel={`${label}, ${count}`}
               accessibilityState={{ selected: on }}
-              style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, minWidth: 64, justifyContent: "center", backgroundColor: on ? fill : "transparent", borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.hairline }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, minWidth: 64, justifyContent: "center", backgroundColor: on ? fill : "transparent", transitionProperty: "backgroundColor", transitionDuration: 140, borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.hairline }}
             >
               <Icon color={ink} />
               <View style={{ overflow: "hidden" }}>
@@ -85,7 +85,7 @@ export function VoteButtons({ vote: { state, press, pop, mode } }: { vote: Retur
                   </T>
                 </Animated.View>
               </View>
-            </Pressable>
+            </APressable>
           );
         })}
       </Animated.View>
@@ -121,7 +121,7 @@ function FollowChip({ id, handle }: { id: string; handle: string }) {
     );
   function press() {
     if (!once(`follow:${id}`)) return;
-    Haptics.selectionAsync();
+    haptic.tap();
     follow(id).catch(() => toast("Couldn't do that just now. Try again."));
   }
   return (
@@ -133,45 +133,51 @@ function FollowChip({ id, handle }: { id: string; handle: string }) {
   );
 }
 
-export function PersonLink({ handle, avatar, photo, size = 24 }: { handle: string; avatar: string | null; photo: string | null; size?: number }) {
+export function PersonLink({ handle, name, avatar, photo, size = 24 }: { handle: string; name?: string | null; avatar: string | null; photo: string | null; size?: number }) {
   const { colors } = useTheme();
   const go = useGo();
   return (
     <Pressable onPress={() => go(`/u/${handle}`)} accessibilityRole="link" hitSlop={8} style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
       <Avatar handle={handle} code={avatar} photo={photo} size={size} />
-      <T size={13} weight={600} color={colors.muted} numberOfLines={1} style={{ flexShrink: 1 }}>
-        @{handle}
-      </T>
+      {name ? (
+        <T size={14} weight={700} numberOfLines={1} style={{ flexShrink: 1 }}>
+          {name}
+        </T>
+      ) : (
+        <T size={13} weight={600} color={colors.muted} numberOfLines={1} style={{ flexShrink: 1 }}>
+          @{handle}
+        </T>
+      )}
     </Pressable>
   );
 }
 
-// Every photo shows at the same 4:5, cropped to fill; full screen shows the whole picture.
+// Every photo shows at the same 4:5, cropped to fill; opened large, the whole picture shows.
 const PHOTO_RATIO = 5 / 4;
 
-// One photo in the feed: one tap opens it full screen, two tap agree, two fingers pinch it.
+// One photo in the feed: one tap opens it large, two tap agree, two fingers pinch it.
 function FeedPhoto({ path, label, width, height, onTap, onPinch }: { path: string; label: string; width: number; height: number; onTap: () => void; onPinch: (on: boolean) => void }) {
   const uri = photoUrl(path);
   return (
     <PinchZoom uri={uri} onActive={onPinch}>
       <Pressable onPress={onTap} accessibilityRole="imagebutton" accessibilityLabel={label}>
-        <Image source={uri} style={{ width, height }} contentFit="cover" transition={150} recyclingKey={path} />
+        <Image source={uri} style={{ width, height }} contentFit="cover" transition={180} recyclingKey={path} />
       </Pressable>
     </PinchZoom>
   );
 }
 
-// Swipe through a take's photos, with dots when there are several.
-export function PhotoCarousel({ photos, dish, onAgree, width, rounded }: { photos: { path: string }[]; dish: string; onAgree?: () => void; width: number; rounded?: boolean }) {
+// Swipe through a take's photos, with a 2/4 badge when there are several.
+export function PhotoCarousel({ photos, dish, onAgree, width }: { photos: { path: string }[]; dish: string; onAgree?: () => void; width: number }) {
   const { colors } = useTheme();
   const [at, setAt] = useState(0);
   const [viewing, setViewing] = useState<number | null>(null);
   const [pinching, setPinching] = useState(false);
   const height = width * PHOTO_RATIO;
   const tap = useTap(onAgree);
-  const photo = (path: string, index: number) => <FeedPhoto path={path} label={`Photo ${index + 1} of ${dish}. Opens full screen`} width={width} height={height} onTap={() => tap(() => setViewing(index))} onPinch={setPinching} />;
+  const photo = (path: string, index: number) => <FeedPhoto path={path} label={`Photo ${index + 1} of ${dish}. Opens large`} width={width} height={height} onTap={() => tap(() => setViewing(index))} onPinch={setPinching} />;
   return (
-    <View style={{ width, height, borderRadius: rounded ? 12 : 0, overflow: "hidden", backgroundColor: colors.raised }}>
+    <View style={{ width, height, borderRadius: 14, overflow: "hidden", backgroundColor: colors.raised }}>
       {photos.length === 1 ? (
         photo(photos[0].path, 0)
       ) : (
@@ -182,15 +188,20 @@ export function PhotoCarousel({ photos, dish, onAgree, width, rounded }: { photo
           scrollEnabled={!pinching}
           showsHorizontalScrollIndicator={false}
           keyExtractor={(p) => p.path}
-          onMomentumScrollEnd={(e) => setAt(Math.round(e.nativeEvent.contentOffset.x / width))}
+          scrollEventThrottle={32}
+          onScroll={(e) => {
+            const i = Math.round(e.nativeEvent.contentOffset.x / width);
+            if (i !== at) {
+              haptic.tap();
+              setAt(i);
+            }
+          }}
           renderItem={({ item, index }) => photo(item.path, index)}
         />
       )}
       {photos.length > 1 && (
-        <View pointerEvents="none" style={{ position: "absolute", bottom: 8, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 4 }}>
-          {photos.map((p, i) => (
-            <View key={p.path} style={{ width: 16, height: 5, borderRadius: 3, backgroundColor: "#fff4ea", opacity: i === at ? 1 : 0.45 }} />
-          ))}
+        <View pointerEvents="none" style={{ position: "absolute", top: 10, right: 10 }}>
+          <CountBadge at={at} of={photos.length} />
         </View>
       )}
       {viewing !== null && <PhotoViewer paths={photos.map((p) => p.path)} start={viewing} onClose={() => setViewing(null)} />}
@@ -242,8 +253,8 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
   const mode = viewer === r.author.username ? "own" : "vote";
   const place = r.dish.restaurant;
   const byline = (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-      <PersonLink handle={r.author.username} avatar={r.author.avatar} photo={r.author.avatar_path} />
+    <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <PersonLink handle={r.author.username} name={r.author.display_name ?? `@${r.author.username}`} avatar={r.author.avatar} photo={r.author.avatar_path} size={30} />
       <FollowChip id={r.author.id} handle={r.author.username} />
       <T size={13} color={colors.faint}>
         {timeAgo(r.created_at)}
@@ -258,62 +269,59 @@ export const ReviewCard = memo(function ReviewCard({ review: r, vote, showDish =
       ? undefined
       : () => {
           if (voting.state.mine !== "facts") voting.press("facts");
-          else Haptics.selectionAsync();
+          haptic.medium();
           setBurst((n) => n + 1);
         };
   const tap = useTap(agree);
   return (
-    <Pressable onPress={() => tap(open)} accessible={!full} style={{ paddingVertical: 16, gap: 10 }}>
-      {!showDish && (
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+    <Pressable onPress={() => tap(open)} accessible={!full} style={{ paddingVertical: 16, gap: 12 }}>
+      {!inMeal && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           {byline}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Verdict score={r.score} />
-            <Score score={r.score} size={48} />
-          </View>
+          {!showDish && (
+            <>
+              <Verdict score={r.score} />
+              <Score score={r.score} size={48} />
+            </>
+          )}
         </View>
       )}
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
-          {showDish && (
-            <View style={{ gap: 2 }}>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-                <DietMark diet={r.dish.diet} />
-                <Pressable onPress={() => go(dishHref(place.slug, r.dish.name))} accessibilityRole="link" hitSlop={6} style={{ flexShrink: 1 }}>
-                  <T size={17} weight={700}>
-                    {r.dish.name}
-                  </T>
-                </Pressable>
-                <Verdict score={r.score} />
-              </View>
-              {!inMeal && (
-                <Pressable onPress={() => go(`/r/${place.slug}`)} accessibilityRole="link" hitSlop={6}>
-                  <T size={14} color={colors.faint}>
-                    from{" "}
-                    <T size={14} weight={500} color={colors.muted}>
-                      {place.name}
-                    </T>
-                    {` · ${place.city}`}
-                  </T>
-                </Pressable>
-              )}
-              {full && <DishAvg avg={r.dish.avg_score} count={r.dish.rating_count} />}
+      {showDish && (
+        <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+              <DietMark diet={r.dish.diet} />
+              <Pressable onPress={() => go(dishHref(place.slug, r.dish.name))} accessibilityRole="link" hitSlop={6} style={{ flexShrink: 1 }}>
+                <T size={17} weight={700}>
+                  {r.dish.name}
+                </T>
+              </Pressable>
+              <Verdict score={r.score} />
             </View>
-          )}
-          {!!r.take && (
-            <T size={15} numberOfLines={full ? undefined : 6} style={{ lineHeight: 23 }}>
-              {r.take}
-            </T>
-          )}
-          {showDish && !inMeal && byline}
-        </View>
-        {showDish && <Score score={r.score} size={full ? 76 : inMeal ? 54 : 64} />}
-      </View>
-      {r.photos.length > 0 && (
-        <View style={inMeal ? undefined : { marginHorizontal: -20 }}>
-          <PhotoCarousel photos={r.photos} dish={r.dish.name} onAgree={agree} width={inMeal ? width - 71 : width} rounded={inMeal} />
+            {!inMeal && (
+              <Pressable onPress={() => go(`/r/${place.slug}`)} accessibilityRole="link" hitSlop={6}>
+                <T size={14} color={colors.faint}>
+                  from{" "}
+                  <T size={14} weight={500} color={colors.muted}>
+                    {place.name}
+                  </T>
+                  {` · ${place.city}`}
+                </T>
+              </Pressable>
+            )}
+            {full && <DishAvg avg={r.dish.avg_score} count={r.dish.rating_count} />}
+          </View>
+          <Score score={r.score} size={full ? 76 : inMeal ? 54 : 64} />
         </View>
       )}
+      {!!r.take && (
+        <View style={{ alignSelf: "flex-start", maxWidth: "100%", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, borderTopLeftRadius: 4, backgroundColor: colors.raised }}>
+          <T size={16} weight={500} numberOfLines={full ? undefined : 6} style={{ lineHeight: 24 }}>
+            {r.take}
+          </T>
+        </View>
+      )}
+      {r.photos.length > 0 && <PhotoCarousel photos={r.photos} dish={r.dish.name} onAgree={agree} width={inMeal ? width - 71 : width - 40} />}
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
         <VoteButtons vote={voting} />
         {!full && (
@@ -349,7 +357,7 @@ export function MealCard({ reviews, votes }: { reviews: Review[]; votes: Record<
         </Pressable>
         <T size={14} style={{ flex: 1 }}>
           <T size={14} weight={600} onPress={() => go(`/u/${author.username}`)}>
-            @{author.username}
+            {author.display_name ?? `@${author.username}`}
           </T>
           <T size={14} color={colors.muted}>{` had ${reviews.length} dishes at `}</T>
           <T size={14} weight={600} onPress={() => go(`/r/${dish.restaurant.slug}`)}>
@@ -380,7 +388,7 @@ export function SaveButton({ dishId, saved: initial, compact }: { dishId: string
   function press() {
     if (!once(`save:${dishId}`, 400)) return;
     set(!saved);
-    Haptics.selectionAsync();
+    haptic.tap();
     setSaved(dishId, !saved).catch(() => {
       set(saved);
       toast("Couldn't save that. Try again.");
@@ -419,7 +427,7 @@ export function ShareSheet({ open, onClose, url, preview }: { open: boolean; onC
   const { colors } = useTheme();
   async function copy() {
     await Clipboard.setStringAsync(url);
-    Haptics.selectionAsync();
+    haptic.tap();
     onClose();
     toast("Link copied");
   }
@@ -452,14 +460,22 @@ export function ShareSheet({ open, onClose, url, preview }: { open: boolean; onC
 export function ShareButton({ path, title, preview, size = 20, compact }: { path: string; title: string; preview?: ReactNode; size?: number; compact?: boolean }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
+  const [used, setUsed] = useState(false); // the sheet isn't built until someone first shares
   return (
     <>
-      <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="Share" hitSlop={compact ? 6 : 0} style={{ width: compact ? 38 : 44, height: compact ? 38 : 44, alignItems: "center", justifyContent: "center" }}>
+      <Pressable
+        onPress={() => {
+          haptic.tap();
+          setUsed(true);
+          setOpen(true);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Share" hitSlop={compact ? 6 : 0} style={{ width: compact ? 38 : 44, height: compact ? 38 : 44, alignItems: "center", justifyContent: "center" }}>
         <Share2Icon size={size} color={compact ? colors.muted : colors.foreground} />
       </Pressable>
-      {open && (
+      {used && (
         <ShareSheet
-          open
+          open={open}
           onClose={() => setOpen(false)}
           url={`${SHARE_SITE}${path}`}
           preview={
@@ -475,33 +491,25 @@ export function ShareButton({ path, title, preview, size = 20, compact }: { path
   );
 }
 
-// A take as the sheet shows it: who said it, what, and the dish with its score.
+// A take as the sheet shows it, matching the card the link unfurls into: the photo with its score, or the score on its own.
 function TakePreview({ r }: { r: Review }) {
   const { colors } = useTheme();
+  const photo = r.photos[0]?.path;
   return (
     <View style={{ gap: 10 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Avatar handle={r.author.username} code={r.author.avatar} photo={r.author.avatar_path} size={28} />
-        <T size={14} weight={600}>
-          @{r.author.username}
-        </T>
-        <T size={13} color={colors.faint}>
-          {timeAgo(r.created_at)}
-        </T>
-      </View>
-      {!!r.take && (
-        <T numberOfLines={4} style={{ lineHeight: 22 }}>
-          {r.take}
-        </T>
+      {photo && (
+        <View style={{ aspectRatio: 1.9, borderRadius: 10, overflow: "hidden", backgroundColor: colors.raised }}>
+          <Image source={photoUrl(photo)} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+        </View>
       )}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.hairline }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
         <Score score={r.score} size={44} />
         <View style={{ flex: 1 }}>
-          <T size={14} weight={700} numberOfLines={1}>
+          <T size={15} weight={700} numberOfLines={1}>
             {r.dish.name}
           </T>
           <T size={13} color={colors.muted} numberOfLines={1}>
-            {r.dish.restaurant.name} · {r.dish.restaurant.city}
+            {r.dish.restaurant.name} · {r.author.display_name ?? `@${r.author.username}`}
           </T>
         </View>
       </View>

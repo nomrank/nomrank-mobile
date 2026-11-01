@@ -1,10 +1,13 @@
-import { Pressable, View } from "react-native";
+import { useEffect } from "react";
+import { Pressable, useWindowDimensions, View } from "react-native";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Tabs, useRouter, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BellIcon, HomeIcon, PlusIcon, SwordsIcon } from "lucide-react-native";
 import { Avatar } from "@/components/marks";
-import { T } from "@/components/ui";
+import { Press, T } from "@/components/ui";
 import { useActivity } from "@/lib/activity";
+import { haptic } from "@/lib/haptics";
 import { once } from "@/lib/once";
 import { tabPressed } from "@/lib/scroll";
 import { useSession } from "@/lib/session";
@@ -16,6 +19,7 @@ const LABELS: Record<string, string> = { index: "Home", battles: "Battles", noti
 function TabBar({ state }: { state: { index: number; routes: { key: string; name: string }[] } }) {
   const { colors } = useTheme();
   const { bottom } = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { profile } = useSession();
   const { unread } = useActivity();
   const router = useRouter();
@@ -24,6 +28,7 @@ function TabBar({ state }: { state: { index: number; routes: { key: string; name
     <Pressable
       key={name}
       onPress={() => {
+        if (!active) haptic.tap();
         router.navigate((name === "index" ? "/" : `/${name}`) as Href);
         tabPressed(name);
       }}
@@ -32,7 +37,6 @@ function TabBar({ state }: { state: { index: number; routes: { key: string; name
       accessibilityState={{ selected: active }}
       style={{ flex: 1, height: 56, alignItems: "center", justifyContent: "center", gap: 2 }}
     >
-      {active && <View style={{ position: "absolute", top: 0, width: 24, height: 2, borderRadius: 2, backgroundColor: brand.ketchup }} />}
       {icon}
       <T size={11} weight={600} color={active ? colors.foreground : colors.faint}>
         {label}
@@ -41,6 +45,15 @@ function TabBar({ state }: { state: { index: number; routes: { key: string; name
   );
 
   const current = state.routes[state.index].name;
+  // A short line slides to the open tab. The + sits in the middle slot.
+  const slots = profile ? 5 : 2;
+  const slot = { index: 0, battles: 1, notifications: 3, you: 4 }[current] ?? 0;
+  const spot = (width / slots) * (slot + 0.5) - 12;
+  const x = useSharedValue(spot);
+  useEffect(() => {
+    x.value = withTiming(spot, { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1) });
+  }, [spot, x]);
+  const marker = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
   const ink = (name: string) => (current === name ? colors.foreground : colors.faint);
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: "row", paddingBottom: bottom, backgroundColor: colors.paper, borderTopWidth: 1, borderTopColor: colors.hairline }}>
@@ -48,13 +61,11 @@ function TabBar({ state }: { state: { index: number; routes: { key: string; name
       {tab("battles", current === "battles", <SwordsIcon size={22} color={ink("battles")} />, LABELS.battles)}
       {profile && (
         <>
-          <Pressable onPress={() => once("go:/rate") && router.push("/rate")} accessibilityRole="button" accessibilityLabel="Rate a dish" style={{ flex: 1, height: 56, alignItems: "center" }}>
-            {({ pressed }) => (
-              <View style={{ position: "absolute", top: -16, width: 52, height: 52, borderRadius: 26, backgroundColor: brand.ketchup, alignItems: "center", justifyContent: "center", elevation: 6, transform: [{ scale: pressed ? 0.92 : 1 }] }}>
-                <PlusIcon size={26} color={brand.studio} strokeWidth={2.75} />
-              </View>
-            )}
-          </Pressable>
+          <Press onPress={() => once("go:/rate") && router.push("/rate")} to={0.92} accessibilityRole="button" accessibilityLabel="Rate a dish" style={{ flex: 1, height: 56, alignItems: "center", justifyContent: "center" }}>
+            <View style={{ width: 46, height: 34, borderRadius: 12, backgroundColor: brand.ketchup, alignItems: "center", justifyContent: "center" }}>
+              <PlusIcon size={20} color={brand.studio} strokeWidth={2.75} />
+            </View>
+          </Press>
           {tab(
             "notifications",
             current === "notifications",
@@ -74,6 +85,7 @@ function TabBar({ state }: { state: { index: number; routes: { key: string; name
           {tab("you", current === "you", <Avatar handle={profile.username} code={profile.avatar} photo={profile.avatar_path} size={24} />, LABELS.you)}
         </>
       )}
+      <Animated.View pointerEvents="none" style={[{ position: "absolute", top: 0, left: 0, width: 24, height: 2, borderRadius: 2, backgroundColor: brand.ketchup }, marker]} />
     </View>
   );
 }
@@ -81,7 +93,7 @@ function TabBar({ state }: { state: { index: number; routes: { key: string; name
 export default function TabsLayout() {
   const { colors } = useTheme();
   return (
-    <Tabs tabBar={(props) => <TabBar state={props.state} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}>
+    <Tabs tabBar={(props) => <TabBar state={props.state} />} screenOptions={{ headerShown: false, animation: "fade", sceneStyle: { backgroundColor: colors.background } }}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="battles" />
       <Tabs.Screen name="notifications" />

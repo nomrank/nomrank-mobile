@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, Share, View, type LayoutChangeEvent } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
+import { haptic } from "@/lib/haptics";
 import Animated, { FadeIn, useAnimatedStyle, useReducedMotion, withTiming } from "react-native-reanimated";
 import { CheckIcon, FlameIcon, ShareIcon, SwordsIcon, TrophyIcon } from "lucide-react-native";
 import { getBattles, split, type Battle } from "@/core/battles";
@@ -160,7 +160,7 @@ export default function Battles() {
       const optimistic = { ...battle, mine: side, votes: { a: battle.votes.a + (side === "a" ? 1 : 0) - (battle.mine === "a" ? 1 : 0), b: battle.votes.b + (side === "b" ? 1 : 0) - (battle.mine === "b" ? 1 : 0) } };
       setBattles((all) => all && all.map((b) => (b.id === battle.id ? optimistic : b)));
       if (first) setStreak((n) => n + 1);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      haptic.light();
       setSaving(battle.id);
       const result = await voteBattle(battle.id, userId, side);
       setSaving(null);

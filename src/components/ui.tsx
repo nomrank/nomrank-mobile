@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { Modal, Pressable, Text, TextInput, View, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle } from "react-native";
+import { Modal, Pressable, Text, TextInput, useWindowDimensions, View, type PressableProps, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowLeftIcon, ChevronRightIcon, SendIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { FadeIn, SlideInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated, { Easing, FadeIn, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { haptic } from "@/lib/haptics";
 import { FoxLoader } from "./loader";
 import { brand, useTheme } from "@/theme";
 
@@ -14,7 +16,7 @@ export const SERIF = "DMSerifDisplay_400Regular";
 type TProps = TextProps & { size?: number; weight?: keyof typeof FONT; color?: string; style?: StyleProp<TextStyle> };
 
 // All text: Geist at a size and weight, in the theme's foreground unless told otherwise.
-const APressable = Animated.createAnimatedComponent(Pressable);
+export const APressable = Animated.createAnimatedComponent(Pressable);
 
 // A pressable that gives under the finger: quick down, a little slower back.
 export function Press({ style, onPress, onPressIn, onPressOut, to = 0.97, ...rest }: Omit<PressableProps, "style"> & { style?: StyleProp<ViewStyle>; to?: number }) {
@@ -27,6 +29,7 @@ export function Press({ style, onPress, onPressIn, onPressOut, to = 0.97, ...res
       onPress={(e) => {
         if (e.timeStamp - last.current < 500) return; // a double tap is one action
         last.current = e.timeStamp;
+        haptic.light();
         onPress?.(e);
       }}
       onPressIn={(e) => {
@@ -148,7 +151,10 @@ export function TabRow<K extends string>({ tabs, value, onChange }: { tabs: read
       {tabs.map(([k, label]) => (
         <Pressable
           key={k}
-          onPress={() => onChange(k)}
+          onPress={() => {
+            if (k !== value) haptic.tap();
+            onChange(k);
+          }}
           onLayout={(e) => {
             spots.current[k] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
             if (k === value) move(k, true);
@@ -173,7 +179,7 @@ export function SortRow<K extends string>({ options, value, onChange }: { option
   return (
     <View style={{ flexDirection: "row", gap: 16 }}>
       {options.map((s) => (
-        <Pressable key={s} onPress={() => onChange(s)} accessibilityRole="button" accessibilityState={{ selected: value === s }} style={{ minHeight: 40, justifyContent: "center" }}>
+        <Pressable key={s} onPress={() => { haptic.tap(); onChange(s); }} accessibilityRole="button" accessibilityState={{ selected: value === s }} style={{ minHeight: 40, justifyContent: "center" }}>
           <T size={14} weight={value === s ? 600 : 400} color={value === s ? colors.mustardInk : colors.muted} style={{ textTransform: "capitalize" }}>
             {s}
           </T>
@@ -206,10 +212,14 @@ export function Header({ title, right }: { title?: string; right?: ReactNode }) 
   );
 }
 
-export function Loading() {
+// The fox, in the middle of the screen. `cover` lays it over a list, whose rows would otherwise pull it to the top. It waits a beat
+// so a quick load never flashes it.
+export function Loading({ cover }: { cover?: boolean }) {
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}>
-      <FoxLoader size={84} />
+    <View pointerEvents="none" style={[{ alignItems: "center", justifyContent: "center", padding: 32 }, cover ? { position: "absolute", top: 0, bottom: 0, left: 0, right: 0 } : { flex: 1 }]}>
+      <Animated.View entering={FadeIn.delay(100).duration(160)}>
+        <FoxLoader size={84} />
+      </Animated.View>
     </View>
   );
 }
@@ -245,7 +255,7 @@ export function Empty({ title, children }: { title?: string; children?: ReactNod
 export function Row({ onPress, label, title, meta, leading }: { onPress: () => void; label?: string; title: ReactNode; meta?: ReactNode; leading?: ReactNode }) {
   const { colors } = useTheme();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" android_ripple={{ color: colors.raised }} style={{ minHeight: 64, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline }}>
+    <Pressable onPress={() => { haptic.tap(); onPress(); }} accessibilityRole="button" android_ripple={{ color: colors.raised }} style={{ minHeight: 64, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: 1, borderBottomColor: colors.hairline }}>
       {leading}
       <View style={{ flex: 1, minWidth: 0 }}>
         {label && (
@@ -261,19 +271,51 @@ export function Row({ onPress, label, title, meta, leading }: { onPress: () => v
   );
 }
 
-// A bottom sheet on a dimmed backdrop. Tap outside, or Android back, closes it.
+const DRAWER = Easing.bezier(0.32, 0.72, 0, 1);
+
+// A bottom sheet on a dimmed backdrop: rises, and leaves the way it came. Tap outside, drag the handle down, or Android back closes it.
 export function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
   const { colors } = useTheme();
   const { bottom } = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const [shown, setShown] = useState(open);
+  const y = useSharedValue(height);
+  useEffect(() => {
+    if (open) {
+      setShown(true);
+      y.value = withTiming(0, { duration: 280, easing: DRAWER });
+    } else {
+      y.value = withTiming(height, { duration: 200, easing: DRAWER }, (done) => {
+        if (done) runOnJS(setShown)(false);
+      });
+    }
+  }, [open, height, y]);
+  const panel = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
+  const dim = useAnimatedStyle(() => ({ opacity: 1 - y.value / height }));
+  const drag = Gesture.Pan()
+    .onUpdate((e) => {
+      y.value = e.translationY > 0 ? e.translationY : e.translationY * 0.2;
+    })
+    .onEnd((e) => {
+      if (e.translationY > 100 || e.velocityY > 800) runOnJS(onClose)();
+      else y.value = withTiming(0, { duration: 200, easing: DRAWER });
+    });
+  if (!shown) return null;
   return (
-    <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <Animated.View entering={FadeIn.duration(160)} style={{ flex: 1, backgroundColor: "rgba(23,17,28,0.7)" }}>
-        <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
-      </Animated.View>
-      <Animated.View entering={SlideInDown.duration(220)} style={{ position: "absolute", left: 0, right: 0, bottom: 0, maxHeight: "85%", borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.paper, padding: 20, paddingTop: 12, paddingBottom: bottom + 20 }}>
-        <View style={{ alignSelf: "center", width: 36, height: 4, borderRadius: 2, backgroundColor: colors.hairline, marginBottom: 14 }} />
-        {children}
-      </Animated.View>
+    <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Animated.View style={[{ flex: 1, backgroundColor: "rgba(23,17,28,0.7)" }, dim]}>
+          <Pressable accessibilityLabel="Close" onPress={onClose} style={{ flex: 1 }} />
+        </Animated.View>
+        <Animated.View style={[{ position: "absolute", left: 0, right: 0, bottom: 0, maxHeight: "85%", borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.paper, paddingHorizontal: 20, paddingBottom: bottom + 20 }, panel]}>
+          <GestureDetector gesture={drag}>
+            <View collapsable={false} style={{ alignItems: "center", paddingTop: 12, paddingBottom: 14 }}>
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.hairline }} />
+            </View>
+          </GestureDetector>
+          {children}
+        </Animated.View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

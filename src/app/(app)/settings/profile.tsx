@@ -5,7 +5,7 @@ import * as Crypto from "expo-crypto";
 import { CameraIcon, Trash2Icon } from "lucide-react-native";
 import { avatarPhotoUrl, avatarTraits, COLOURS, encodeAvatar, EYES, MOUTHS, SHAPES, type Traits } from "@/core/avatar";
 import { DIETS, GENDERS, getPrivateDetails, getProfileByHandle } from "@/core/profiles";
-import { DateOfBirth, RegionPicker } from "@/components/forms";
+import { DateOfBirth, RegionField } from "@/components/forms";
 import { Avatar, DietMark } from "@/components/marks";
 import { toast } from "@/components/toast";
 import { Btn, Chip, Failed, Header, Input, Loading, T, TabRow, useData } from "@/components/ui";
@@ -131,7 +131,7 @@ function Form({ initial, userId, handle }: { initial: Initial; userId: string; h
             {regions.find((r) => r.slug === region)?.name}. You can change it again on {lockedUntil}.
           </T>
         ) : (
-          <RegionPicker regions={regions} value={region} onChange={setRegion} />
+          <RegionField regions={regions} value={region} onChange={setRegion} />
         )}
         {error && (
           <T accessibilityRole="alert" color={colors.destructive}>

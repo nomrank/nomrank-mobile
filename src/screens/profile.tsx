@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { FlatList, Linking, Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -381,7 +382,7 @@ export function ProfileScreen({ handle, tab: asTab }: { handle: string; tab?: bo
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `go` is stable in effect
   }, [data, tab, viewer?.username, followOverride, colors]);
 
-  const renderItem = useCallback(({ item }: { item: Item }) => <>{item.node()}</>, []);
+  const renderItem = useCallback(({ item, index }: { item: Item; index: number }) => (index < 6 ? <Animated.View entering={FadeIn.duration(180)}>{item.node()}</Animated.View> : <>{item.node()}</>), []);
 
   const head = asTab ? <View style={{ height: top }} /> : <Header />;
   if (failed && !data) return <>{head}<Failed onRetry={reload} /></>;

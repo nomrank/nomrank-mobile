@@ -3,7 +3,7 @@ import { Pressable, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 import Svg, { G, Path, Text as SvgText } from "react-native-svg";
-import * as Haptics from "expo-haptics";
+import { haptic } from "@/lib/haptics";
 import { MinusIcon, PlusIcon } from "lucide-react-native";
 import { angleOf, point, scoreAtAngle, sector } from "@/core/plate";
 import { formatScore, scoreColor, verdict } from "@/core/ratings";
@@ -30,7 +30,7 @@ export function ScoreMeter({ score, onChange }: { score: number; onChange: (n: n
     latest.current = n;
     onChange(n);
     tick((x) => x + 1);
-    Haptics.selectionAsync();
+    haptic.tap();
   };
   const step = (by: number) => pick(Math.min(10, Math.max(0.5, (latest.current || 0) + by)));
 

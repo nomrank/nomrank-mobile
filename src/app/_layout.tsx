@@ -84,7 +84,7 @@ function Routes() {
     >
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <StatusBar style={!seen || scheme === "dark" ? "light" : "dark"} />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+        <Stack screenOptions={{ headerShown: false, animation: "fade", contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Protected guard={!seen}>
             <Stack.Screen name="welcome" />
           </Stack.Protected>

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Pressable, View } from "react-native";
-import { CheckIcon, SearchIcon } from "lucide-react-native";
+import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { CheckIcon, ChevronRightIcon, SearchIcon } from "lucide-react-native";
+import { haptic } from "@/lib/haptics";
 import { brand, useTheme } from "@/theme";
-import { Input, Overline, T } from "./ui";
+import { Input, Overline, Sheet, T } from "./ui";
 
 export type PickableRegion = { slug: string; name: string; kind: "state" | "ut" };
 
@@ -27,7 +28,7 @@ export function RegionPicker({ regions, value, onChange }: { regions: PickableRe
           <View key={kind} style={{ gap: 2 }}>
             <Overline style={{ marginTop: 8 }}>{kind === "state" ? "States" : "Union territories"}</Overline>
             {list.map((r) => (
-              <Pressable key={r.slug} onPress={() => onChange(r.slug)} accessibilityRole="radio" accessibilityState={{ selected: value === r.slug }} style={{ minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, borderRadius: 10, backgroundColor: value === r.slug ? "rgba(255,194,60,0.15)" : "transparent" }}>
+              <Pressable key={r.slug} onPress={() => { haptic.tap(); onChange(r.slug); }} accessibilityRole="radio" accessibilityState={{ selected: value === r.slug }} style={{ minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, borderRadius: 10, backgroundColor: value === r.slug ? "rgba(255,194,60,0.15)" : "transparent" }}>
                 <T weight={value === r.slug ? 600 : 400}>{r.name}</T>
                 {value === r.slug && <CheckIcon size={18} color={colors.mustardInk} />}
               </Pressable>
@@ -36,6 +37,44 @@ export function RegionPicker({ regions, value, onChange }: { regions: PickableRe
         );
       })}
     </View>
+  );
+}
+
+// The same choice as one calm row: it shows where home is now, and the full list opens in a sheet only when you want to change it.
+export function RegionField({ regions, value, onChange }: { regions: PickableRegion[]; value: string; onChange: (slug: string) => void }) {
+  const { colors } = useTheme();
+  const { height } = useWindowDimensions();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Pressable
+        onPress={() => {
+          haptic.tap();
+          setOpen(true);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Change home region"
+        style={{ minHeight: 48, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.input, backgroundColor: colors.raised, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+      >
+        <T>{regions.find((r) => r.slug === value)?.name ?? "Pick a state"}</T>
+        <ChevronRightIcon size={18} color={colors.muted} />
+      </Pressable>
+      <Sheet open={open} onClose={() => setOpen(false)}>
+        <T size={18} weight={700} style={{ marginBottom: 12 }}>
+          Where did you grow up?
+        </T>
+        <ScrollView style={{ height: height * 0.62 }} keyboardShouldPersistTaps="handled">
+          <RegionPicker
+            regions={regions}
+            value={value}
+            onChange={(slug) => {
+              onChange(slug);
+              setOpen(false);
+            }}
+          />
+        </ScrollView>
+      </Sheet>
+    </>
   );
 }
 
@@ -90,7 +129,7 @@ export function OptionList<V extends string>({ options, value, onChange }: { opt
       {options.map((o) => {
         const on = value === o.value;
         return (
-          <Pressable key={o.value} onPress={() => onChange(o.value)} accessibilityRole="radio" accessibilityState={{ selected: on }} style={{ minHeight: 56, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: on ? brand.mustard : colors.hairline, backgroundColor: on ? "rgba(255,194,60,0.1)" : colors.paper, flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Pressable key={o.value} onPress={() => { haptic.tap(); onChange(o.value); }} accessibilityRole="radio" accessibilityState={{ selected: on }} style={{ minHeight: 56, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: on ? brand.mustard : colors.hairline, backgroundColor: on ? "rgba(255,194,60,0.1)" : colors.paper, flexDirection: "row", alignItems: "center", gap: 10 }}>
             <View style={{ flex: 1 }}>
               <T size={14} weight={600}>
                 {o.label}

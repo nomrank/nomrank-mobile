@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from "react";
 import { View } from "react-native";
 import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { haptic } from "@/lib/haptics";
 import Animated, { makeMutable, runOnJS, useAnimatedStyle, withTiming } from "react-native-reanimated";
 
 type Spot = { uri: string; x: number; y: number; width: number; height: number };
@@ -17,30 +18,35 @@ export function PinchZoom({ uri, onActive, children }: { uri: string; onActive: 
   const box = useRef<ComponentRef<typeof View>>(null);
   const lift = () => {
     onActive(true);
+    haptic.light();
     box.current?.measureInWindow((left, top, width, height) => place?.({ uri, x: left, y: top, width, height }));
   };
   const drop = () => {
     onActive(false);
     place?.(null);
   };
-  const pinch = Gesture.Pinch()
-    .onStart(() => runOnJS(lift)())
-    .onUpdate((e) => {
-      scale.value = Math.min(4, Math.max(1, e.scale));
-    })
-    .onEnd(() => {
-      x.value = withTiming(0, { duration: 200 });
-      y.value = withTiming(0, { duration: 200 });
-      scale.value = withTiming(1, { duration: 200 }, () => runOnJS(drop)());
-    });
-  const pan = Gesture.Pan()
-    .minPointers(2)
-    .onUpdate((e) => {
-      x.value = e.translationX;
-      y.value = e.translationY;
-    });
+  const gesture = useMemo(() => {
+    const pinch = Gesture.Pinch()
+      .onStart(() => runOnJS(lift)())
+      .onUpdate((e) => {
+        scale.value = Math.min(4, Math.max(1, e.scale));
+      })
+      .onEnd(() => {
+        x.value = withTiming(0, { duration: 200 });
+        y.value = withTiming(0, { duration: 200 });
+        scale.value = withTiming(1, { duration: 200 }, () => runOnJS(drop)());
+      });
+    const pan = Gesture.Pan()
+      .minPointers(2)
+      .onUpdate((e) => {
+        x.value = e.translationX;
+        y.value = e.translationY;
+      });
+    return Gesture.Simultaneous(pinch, pan);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuilt only for a new photo, so a re-render can't cancel a pinch
+  }, [uri]);
   return (
-    <GestureDetector gesture={Gesture.Simultaneous(pinch, pan)}>
+    <GestureDetector gesture={gesture}>
       <View ref={box} collapsable={false}>
         {children}
       </View>

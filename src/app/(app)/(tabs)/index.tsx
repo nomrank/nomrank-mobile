@@ -2,6 +2,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, ty
 import { FlatList, Pressable, RefreshControl, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, type Href } from "expo-router";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronDownIcon, CrownIcon, SearchIcon, XIcon } from "lucide-react-native";
 import { filterMenus, type ShowDiet } from "@/core/diet";
@@ -16,6 +17,7 @@ import { CityPicker, MealCard, ReviewCard, useGo } from "@/components/social";
 import { FirstTour, StartSpace } from "@/components/home-parts";
 import { FoxLoader } from "@/components/loader";
 import { dishCount, Empty, Failed, Input, Loading, Overline, Row, SortRow, T, TabRow, useData, WORDMARK } from "@/components/ui";
+import { haptic } from "@/lib/haptics";
 import { FIRST_LIST_KEY, groupBy, groupDishes, type DishGroup } from "@/lib/home";
 import { useKeepTabsInView, useScrollToTopOnTab } from "@/lib/scroll";
 import { useSession } from "@/lib/session";
@@ -25,7 +27,7 @@ import { brand, useTheme } from "@/theme";
 type View_ = "takes" | "rankings" | "dishes" | "places";
 const TABS = [["takes", "Takes"], ["rankings", "Rankings"], ["dishes", "Dishes"], ["places", "Places"]] as const;
 type Item = { key: string; node: () => ReactNode };
-const WAIT: Item[] = [{ key: "wait", node: () => <Loading /> }];
+const NONE: Item[] = [];
 
 function DishGroupRow({ group: g, href }: { group: DishGroup; href: (s: DishGroup["spots"][number]) => string }) {
   const { colors } = useTheme();
@@ -37,7 +39,7 @@ function DishGroupRow({ group: g, href }: { group: DishGroup; href: (s: DishGrou
   }
   return (
     <View style={{ borderBottomWidth: 1, borderBottomColor: colors.hairline }}>
-      <Pressable onPress={() => setOpen(!open)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ minHeight: 64, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <Pressable onPress={() => { haptic.tap(); setOpen(!open); }} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ minHeight: 64, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
         <View style={{ flex: 1 }}>
           <T size={16} weight={600}>
             {g.name}
@@ -46,14 +48,16 @@ function DishGroupRow({ group: g, href }: { group: DishGroup; href: (s: DishGrou
             At {g.spots.length} places
           </T>
         </View>
-        <ChevronDownIcon size={20} color={colors.foreground} style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }} />
+        <Animated.View style={{ transform: [{ rotate: open ? "180deg" : "0deg" }], transitionProperty: "transform", transitionDuration: 180 }}>
+          <ChevronDownIcon size={20} color={colors.foreground} />
+        </Animated.View>
       </Pressable>
       {open && (
-        <View style={{ marginLeft: 12, marginBottom: 8, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: brand.mustard }}>
+        <Animated.View entering={FadeIn.duration(160)} style={{ marginLeft: 12, marginBottom: 8, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: brand.mustard }}>
           {g.spots.map((s) => (
             <Row key={s.id} onPress={() => go(href(s))} leading={<DietMark diet={s.diet} />} title={<T weight={600}>{s.place.name}</T>} meta={<Meta place={s.place.area} avg={s.avg} count={s.count} />} />
           ))}
-        </View>
+        </Animated.View>
       )}
     </View>
   );
@@ -189,6 +193,7 @@ export default function Home() {
 
   async function refresh() {
     setRefreshing(true);
+    haptic.light();
     await Promise.all([first(), browse.reload()]);
     setRefreshing(false);
   }
@@ -216,7 +221,7 @@ export default function Home() {
     }
     if (view === "takes") {
       if (feedFailed) return [{ key: "fail", node: () => <Failed onRetry={first} /> }];
-      if (!reviews) return [{ key: "wait", node: () => <Loading /> }];
+      if (!reviews) return NONE;
       if (!reviews.length)
         return [{ key: "none", node: () => <Empty title={sort === "following" ? "Nothing from your people yet" : "No takes yet"}>{sort === "following" ? "Follow people from their profiles and their takes land here." : "Rate a dish and write what you thought. It shows up here."}</Empty> }];
       return groupMeals(reviews).map((meal) => ({
@@ -229,7 +234,7 @@ export default function Home() {
       }));
     }
     if (browse.failed && !browse.data) return [{ key: "fail", node: () => <Failed onRetry={browse.reload} /> }];
-    if (!browse.data) return [{ key: "wait", node: () => <Loading /> }];
+    if (!browse.data) return NONE;
     if (view === "rankings") {
       const rows: Item[] = leaders.length ? leaders.map((l) => ({ key: l.list.id, node: () => <RankingRow item={l} /> })) : [{ key: "none", node: () => <Empty>No rankings yet. They fill in as people rate.</Empty> }];
       return profile ? [...rows, { key: "start", node: () => <StartSpace /> }] : rows;
@@ -247,18 +252,21 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `go` is stable in effect
   }, [q, view, reviews, votes, feedFailed, sort, restaurants, leaders, browse.data, browse.failed, profile, colors]);
 
-  const renderItem = useCallback(({ item }: { item: Item }) => <>{item.node()}</>, []);
+  // The first screenful fades in as a tab opens. Rows further down arrive off-screen, so they don't need it.
+  const renderItem = useCallback(({ item, index }: { item: Item; index: number }) => (index < 6 ? <Animated.View entering={FadeIn.duration(180)}>{item.node()}</Animated.View> : <>{item.node()}</>), []);
+  const waiting = tab !== view || (!q && (view === "takes" ? !reviews && !feedFailed : !browse.data && !browse.failed));
 
   return (
     <View style={{ flex: 1, paddingTop: top }}>
       {profile && !profile.tour_done_at && <FirstTour />}
+      {waiting && <Loading cover />}
       <FlatList
         ref={list}
         onScroll={keep.onScroll}
         scrollEventThrottle={32}
         initialNumToRender={4}
         maxToRenderPerBatch={4}
-        data={tab === view ? items : WAIT}
+        data={tab === view ? items : NONE}
         keyExtractor={(i) => i.key}
         renderItem={renderItem}
         keyboardShouldPersistTaps="handled"

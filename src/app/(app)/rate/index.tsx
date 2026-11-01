@@ -17,6 +17,7 @@ import { confirm } from "@/components/dialog";
 import { toast } from "@/components/toast";
 import { Btn, Card, Empty, Failed, Header, Input, Loading, Overline, Press, Row, SendButton, Sheet, T, useData } from "@/components/ui";
 import { pickFromLibrary, saveRating, takePhoto, type PhotoDraft, type Posted } from "@/lib/actions";
+import { haptic } from "@/lib/haptics";
 import { groupDishes } from "@/lib/home";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -260,8 +261,14 @@ function RateForm({ dish, existing }: { dish: DishDetail; existing: { score: num
     setBusy(true);
     const r = await saveRating(userId, profile?.regions?.name, dish.id, { score, take }, changed ? photos : null);
     setBusy(false);
-    if (r.error) setError(r.error);
-    if (r.posted) setPosted(r.posted);
+    if (r.error) {
+      haptic.warning();
+      setError(r.error);
+    }
+    if (r.posted) {
+      haptic.success();
+      setPosted(r.posted);
+    }
   }
 
   if (posted) return <PostedPanel posted={posted} />;

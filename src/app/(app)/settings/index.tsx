@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Linking as ExpoLinking, Pressable, ScrollView, View } from "react-native";
+import { Linking as ExpoLinking, Pressable, ScrollView, Switch, View } from "react-native";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
@@ -13,6 +13,7 @@ import { useGo } from "@/components/social";
 import { toast } from "@/components/toast";
 import { Btn, Card, Header, Loading, Overline, T, useData } from "@/components/ui";
 import { exportData, savePreferences, savePrivacy, signOutEverywhere } from "@/lib/actions";
+import { haptic, hapticsOn, setHaptics } from "@/lib/haptics";
 import { useSession } from "@/lib/session";
 import { SITE, supabase } from "@/lib/supabase";
 import { brand, useTheme, type Choice } from "@/theme";
@@ -40,7 +41,7 @@ function ThemeSwitch() {
   return (
     <View accessibilityRole="radiogroup" accessibilityLabel="Colour theme" style={{ flexDirection: "row", borderRadius: 999, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.paper, padding: 2 }}>
       {THEMES.map(({ value, label, Icon }) => (
-        <Pressable key={value} onPress={() => setChoice(value)} accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ selected: choice === value }} style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: choice === value ? colors.foreground : "transparent" }}>
+        <Pressable key={value} onPress={() => { haptic.tap(); setChoice(value); }} accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ selected: choice === value }} style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: choice === value ? colors.foreground : "transparent" }}>
           <Icon size={17} color={choice === value ? colors.background : colors.muted} />
         </Pressable>
       ))}
@@ -69,6 +70,32 @@ function NotificationsRow() {
         </T>
       </View>
       {on === false && <Btn label="Turn on" variant="secondary" onPress={turnOn} style={{ minHeight: 40 }} />}
+    </Card>
+  );
+}
+
+function HapticsRow() {
+  const { colors } = useTheme();
+  const [on, setOn] = useState(hapticsOn());
+  return (
+    <Card style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <View style={{ flex: 1 }}>
+        <T weight={600}>Haptics</T>
+        <T size={14} color={colors.muted}>
+          Small buzzes when you tap, vote and post.
+        </T>
+      </View>
+      <Switch
+        value={on}
+        onValueChange={(v) => {
+          setHaptics(v);
+          setOn(v);
+          haptic.light();
+        }}
+        accessibilityLabel="Haptics"
+        trackColor={{ true: brand.mustard, false: colors.raised }}
+        thumbColor={on ? brand.studio : colors.muted}
+      />
     </Card>
   );
 }
@@ -125,7 +152,7 @@ function Privacy({ userId, initial }: { userId: string; initial: Record<PrivacyK
           </T>
           <View accessibilityRole="radiogroup" accessibilityLabel={`Who can see ${label}`} style={{ flexDirection: "row", gap: 4, padding: 4, borderRadius: 12, backgroundColor: colors.raised }}>
             {VISIBILITIES.map((v) => (
-              <Pressable key={v.value} onPress={() => setValues({ ...values, [key]: v.value })} accessibilityRole="radio" accessibilityState={{ selected: values[key] === v.value }} style={{ flex: 1, minHeight: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: values[key] === v.value ? brand.mustard : "transparent" }}>
+              <Pressable key={v.value} onPress={() => { haptic.tap(); setValues({ ...values, [key]: v.value }); }} accessibilityRole="radio" accessibilityState={{ selected: values[key] === v.value }} style={{ flex: 1, minHeight: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: values[key] === v.value ? brand.mustard : "transparent" }}>
                 <T size={13} weight={600} color={values[key] === v.value ? brand.studio : colors.muted}>
                   {v.label}
                 </T>
@@ -161,6 +188,7 @@ export default function Settings() {
   }, [userId]);
 
   if (!profile || !userId) return null;
+  if (!privacy) return <><Header title="Settings" /><Loading /></>;
   async function signOut() {
     if (await confirm({ title: "Sign out?", body: "You can sign back in any time.", yes: "Sign out", no: "Stay" })) await signOutEverywhere();
   }
@@ -187,6 +215,7 @@ export default function Settings() {
           </View>
         </Card>
         <NotificationsRow />
+        <HapticsRow />
         <Card style={{ gap: 10 }}>
           <Overline>Preferences</Overline>
           <Preferences />
@@ -196,7 +225,7 @@ export default function Settings() {
           <T size={14} color={colors.muted}>
             What other people can see on your profile.
           </T>
-          {privacy ? <Privacy key={JSON.stringify(privacy)} userId={userId} initial={privacy} /> : <Loading />}
+          <Privacy key={JSON.stringify(privacy)} userId={userId} initial={privacy} />
         </Card>
         <Card style={{ gap: 10 }}>
           <Overline>Account</Overline>
